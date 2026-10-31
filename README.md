@@ -12,6 +12,7 @@
 supabase/
   migrations/20261031000000_init.sql   # 테이블 + RLS + 함수 (nearby_restaurants 등)
   migrations/20261101000000_admin_save_restaurant.sql  # 관리자 식당+정책 저장 함수 (2단계)
+  migrations/20261101000100_revoke_anon_helpers.sql    # 비로그인의 is_admin/owns_restaurant 직접 호출 차단
   seed.sql                             # 로컬용 가상 샘플 식당 4곳 (안산 중앙역 주변)
 src/
   app/                                 # 라우트 (/, /restaurants/[id], /owner, /admin ...)
