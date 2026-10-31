@@ -1,26 +1,30 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * 디자인 토큰 - 주 색상은 하나(primary)만 사용한다.
+ * primary(#C2410C) 위 흰 글자 대비 5.2:1, 흰 배경 위 primary 글자 대비 5.2:1 (WCAG AA 충족)
+ */
+@theme {
+  --color-primary: #c2410c;
+  --color-primary-strong: #9a3412;
+  --color-primary-soft: #fff7ed;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR",
+    "Malgun Gothic", system-ui, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #ffffff;
+  color: #111827;
+  font-family: var(--font-sans);
+}
+
+/* 키보드 사용자를 위한 포커스 표시 */
+:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
 }

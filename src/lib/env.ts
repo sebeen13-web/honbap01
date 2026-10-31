@@ -1,0 +1,30 @@
+import { z } from "zod";
+
+/**
+ * 공개(브라우저 노출 가능) 환경변수.
+ * NEXT_PUBLIC_* 는 빌드 시 코드에 인라인되므로 process.env.X 형태로 직접 참조해야 한다.
+ */
+const publicEnvSchema = z.object({
+  NEXT_PUBLIC_SUPABASE_URL: z.url("NEXT_PUBLIC_SUPABASE_URL 이 올바른 URL 이 아닙니다."),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, "NEXT_PUBLIC_SUPABASE_ANON_KEY 가 비어 있습니다."),
+  NEXT_PUBLIC_KAKAO_MAP_APP_KEY: z.string().min(1, "NEXT_PUBLIC_KAKAO_MAP_APP_KEY 가 비어 있습니다."),
+});
+
+export type PublicEnv = z.infer<typeof publicEnvSchema>;
+
+let cached: PublicEnv | null = null;
+
+export function getPublicEnv(): PublicEnv {
+  if (cached) return cached;
+  const parsed = publicEnvSchema.safeParse({
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_KAKAO_MAP_APP_KEY: process.env.NEXT_PUBLIC_KAKAO_MAP_APP_KEY,
+  });
+  if (!parsed.success) {
+    const messages = parsed.error.issues.map((i) => `- ${i.message}`).join("\n");
+    throw new Error(`환경변수 설정을 확인하세요 (.env.example 참고):\n${messages}`);
+  }
+  cached = parsed.data;
+  return cached;
+}

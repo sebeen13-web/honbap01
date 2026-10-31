@@ -1,103 +1,72 @@
-import Image from "next/image";
+import { createClient } from "@/lib/supabase/server";
+import { DEFAULT_CENTER, DEFAULT_RADIUS_M, SOURCE_LABEL } from "@/lib/constants";
 
-export default function Home() {
+// 1단계 임시 화면: Supabase 연결과 nearby_restaurants 함수 동작을 확인한다.
+// 3단계에서 지도 + 목록 화면으로 교체된다.
+export const dynamic = "force-dynamic";
+
+async function checkConnection() {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("nearby_restaurants", {
+      user_lat: DEFAULT_CENTER.lat,
+      user_lng: DEFAULT_CENTER.lng,
+      radius_m: DEFAULT_RADIUS_M,
+    });
+    if (error) return { ok: false as const, message: error.message };
+    return { ok: true as const, rows: data ?? [] };
+  } catch (e) {
+    return { ok: false as const, message: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export default async function Home() {
+  const result = await checkConnection();
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <main className="mx-auto max-w-md px-4 py-8">
+      <h1 className="text-2xl font-bold text-primary">혼밥 지도</h1>
+      <p className="mt-1 text-sm text-gray-600">1단계 · 연결 확인 화면 (3단계에서 지도 화면으로 바뀝니다)</p>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      <section className="mt-6 rounded-xl border border-gray-200 p-4" aria-live="polite">
+        {result.ok ? (
+          <>
+            <p className="font-semibold text-green-800">✅ Supabase 연결 성공</p>
+            <p className="mt-1 text-sm text-gray-700">
+              안산시청 반경 {DEFAULT_RADIUS_M / 1000}km 안 혼밥 가능 식당: <strong>{result.rows.length}곳</strong>
+            </p>
+            {result.rows.length === 0 ? (
+              <p className="mt-3 text-sm text-gray-600">
+                아직 등록된 식당이 없어요. 로컬이라면 <code>npx supabase db reset</code>으로 샘플 데이터를 넣어 보세요.
+              </p>
+            ) : (
+              <ul className="mt-3 divide-y divide-gray-100">
+                {result.rows.map((r) => (
+                  <li key={r.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+                    <span>
+                      {r.name} <span className="text-gray-500">· {r.category}</span>
+                    </span>
+                    <span className="shrink-0 text-gray-600">
+                      {(r.distance_m / 1000).toFixed(1)}km ·{" "}
+                      <span className="rounded bg-primary-soft px-1.5 py-0.5 text-primary-strong">
+                        {SOURCE_LABEL[r.source]}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="font-semibold text-red-700">⚠️ 연결 실패</p>
+            <pre className="mt-2 whitespace-pre-wrap break-all text-xs text-gray-700">{result.message}</pre>
+            <p className="mt-3 text-sm text-gray-600">
+              <code>.env.local</code> 값과 마이그레이션 적용 여부를 확인하세요.
+            </p>
+          </>
+        )}
+      </section>
+    </main>
   );
 }
