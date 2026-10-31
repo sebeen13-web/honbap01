@@ -3,10 +3,13 @@ import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/types/database";
 import { getPublicEnv } from "@/lib/env";
 
+const ADMIN_PREFIX = "/admin";
+const ADMIN_LOGIN_PATH = "/admin/login";
+
 /**
- * 로그인 세션 쿠키를 갱신한다.
- * 손님(비로그인) 화면에는 영향이 없고, /owner·/admin 에서 세션이 만료되지 않게 해 준다.
- * 접근 제어(로그인/역할 확인)는 2·5단계에서 각 페이지에 추가한다.
+ * 1) 로그인 세션 쿠키를 갱신한다 (/owner·/admin 에서 세션이 만료되지 않게).
+ * 2) /admin/** (로그인 페이지 제외) 는 관리자만 통과시킨다.
+ *    서버 컴포넌트/서버 액션에서도 requireAdmin() 으로 한 번 더 확인한다(이중 확인).
  */
 export async function updateSession(request: NextRequest) {
   const env = getPublicEnv();
@@ -26,7 +29,38 @@ export async function updateSession(request: NextRequest) {
   });
 
   // getUser() 호출이 만료된 토큰을 갱신한다. 지우지 말 것.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { pathname } = request.nextUrl;
+  const isAdminArea = pathname === ADMIN_PREFIX || pathname.startsWith(`${ADMIN_PREFIX}/`);
+  const isAdminLogin = pathname === ADMIN_LOGIN_PATH;
+
+  if (isAdminArea && !isAdminLogin) {
+    if (!user) {
+      return redirectWithCookies(request, response, ADMIN_LOGIN_PATH, { next: pathname });
+    }
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    if (profile?.role !== "admin") {
+      return redirectWithCookies(request, response, ADMIN_LOGIN_PATH, { error: "forbidden" });
+    }
+  }
 
   return response;
+}
+
+/** 리다이렉트하면서 방금 갱신된 세션 쿠키도 함께 내려보낸다. */
+function redirectWithCookies(
+  request: NextRequest,
+  from: NextResponse,
+  pathname: string,
+  params: Record<string, string>,
+) {
+  const url = request.nextUrl.clone();
+  url.pathname = pathname;
+  url.search = new URLSearchParams(params).toString();
+  const redirect = NextResponse.redirect(url);
+  from.cookies.getAll().forEach((c) => redirect.cookies.set(c));
+  return redirect;
 }

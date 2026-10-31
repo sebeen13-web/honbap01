@@ -143,6 +143,25 @@ export type Database = {
         Returns: boolean | null;
       };
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
+      /** 관리자 전용: 식당 + 1인분 정책을 한 번에 등록(p_id = null) 또는 수정. 식당 id 반환 */
+      admin_save_restaurant: {
+        Args: {
+          p_id: string | null;
+          p_name: string;
+          p_address: string;
+          p_latitude: number;
+          p_longitude: number;
+          p_phone: string | null;
+          p_category: Category;
+          p_business_hours: Json | null;
+          p_solo_menus: string[];
+          p_time_slot: TimeSlot;
+          p_time_slot_note: string | null;
+          p_extra_fee: boolean;
+          p_extra_fee_note: string | null;
+        };
+        Returns: string;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

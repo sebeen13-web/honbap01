@@ -28,3 +28,22 @@ body {
   outline: 3px solid var(--color-primary);
   outline-offset: 2px;
 }
+
+/* 폼 공통 스타일 (2단계) */
+@layer components {
+  .input {
+    @apply block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100;
+  }
+  .input[aria-invalid="true"] {
+    @apply border-red-600;
+  }
+  .field-error {
+    @apply mt-1 text-sm text-red-700;
+  }
+  .btn-primary {
+    @apply inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-base font-semibold text-white hover:bg-primary-strong disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-secondary {
+    @apply inline-flex min-h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+}

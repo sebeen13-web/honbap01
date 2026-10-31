@@ -11,9 +11,13 @@
 ```
 supabase/
   migrations/20261031000000_init.sql   # 테이블 + RLS + 함수 (nearby_restaurants 등)
+  migrations/20261101000000_admin_save_restaurant.sql  # 관리자 식당+정책 저장 함수 (2단계)
   seed.sql                             # 로컬용 가상 샘플 식당 4곳 (안산 중앙역 주변)
 src/
   app/                                 # 라우트 (/, /restaurants/[id], /owner, /admin ...)
+  app/admin/login                      # 관리자 로그인 (보호 대상 아님)
+  app/admin/(protected)/               # 관리자 전용: layout 에서 requireAdmin()
+    restaurants/ , restaurants/new , restaurants/[id]/edit
   features/                            # 기능별 폴더 (features/README.md 참고)
   lib/env.ts                           # 환경변수 검증(zod)
   lib/supabase/{client,server,middleware}.ts
@@ -42,3 +46,40 @@ npm run dev                  # http://localhost:3000
 
 로컬 Supabase(Docker 필요): `npm run db:start` → `npm run db:reset` (마이그레이션 + 샘플 데이터)
 원격 Supabase: `npx supabase login` → `npx supabase link --project-ref <ref>` → `npm run db:push`
+
+## 원격 Supabase 프로젝트 만들기
+
+1. https://supabase.com/dashboard → **New project** (Region: Northeast Asia (Seoul) 권장). DB 비밀번호는 따로 보관.
+2. 마이그레이션 + 샘플 데이터 적용 (둘 중 하나)
+   - CLI: `npx supabase login` → `npx supabase link --project-ref <ref>` → `npx supabase db push --include-seed`
+   - 대시보드: **SQL Editor** 에서 `supabase/migrations/*.sql` 을 파일 이름 순서대로 실행한 뒤 `supabase/seed.sql` 실행
+3. **Project Settings > API** 의 Project URL, anon(publishable) 키를 `.env.local` 에 넣는다.
+4. **Authentication > URL Configuration** 의 Site URL 에 `http://localhost:3000`(배포 후엔 배포 주소).
+
+## 관리자 계정 만들기
+
+관리자 가입 화면은 따로 없다(아무나 관리자가 되지 않도록). 계정을 만든 뒤 SQL 로 역할을 바꾼다.
+
+1. Supabase 대시보드 **Authentication > Users > Add user > Create new user**
+   이메일·비밀번호 입력, **Auto Confirm User** 체크 → 가입 트리거가 `profiles` 행(role = owner)을 자동으로 만든다.
+2. **SQL Editor** 에서 실행:
+
+```sql
+update public.profiles
+set role = 'admin'
+where id = (select id from auth.users where email = 'admin@example.com');
+
+-- 확인
+select u.email, p.role from public.profiles p join auth.users u on u.id = p.id;
+```
+
+3. `/admin/login` 에서 로그인. 관리자 권한을 회수할 때는 `role = 'owner'` 로 되돌린다.
+
+로컬 Supabase 라면 Studio(http://127.0.0.1:54323)에서 같은 방법으로 하거나 `psql postgresql://postgres:postgres@127.0.0.1:54322/postgres` 로 위 SQL 을 실행한다.
+
+## 관리자 권한 확인 구조 (2단계)
+
+- `src/middleware.ts` → `/admin/**`(로그인 페이지 제외) 요청마다 로그인 + `profiles.role = 'admin'` 확인, 아니면 `/admin/login`(권한 없음 안내)으로 보낸다.
+- 서버 컴포넌트(`app/admin/(protected)/layout.tsx`, 각 page)와 **모든 서버 액션**에서 `requireAdmin()` 으로 다시 확인한다.
+- DB 에서도 RLS(`관리자 전체` 정책)와 `admin_save_restaurant()` 안의 `is_admin()` 검사로 한 번 더 막는다.
+- 저장 시 `source` / `last_verified_at` 은 클라이언트에서 받지 않는다. 트리거가 `admin_checked` / `now()` 로 기록한다.
