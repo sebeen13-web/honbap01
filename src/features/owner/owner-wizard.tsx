@@ -289,7 +289,7 @@ export function OwnerWizard({
                     latitude: s.latitude,
                     longitude: s.longitude,
                     phone: s.phone ?? p.phone,
-                    category: s.category ? guessCategory(s.category) : p.category,
+                    category: s.category || s.placeName ? guessCategory(s.category, s.placeName) : p.category,
                   }));
                   clearErrors("place");
                   setClaim({ state: "idle" });

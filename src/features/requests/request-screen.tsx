@@ -123,7 +123,7 @@ export function RequestScreen() {
       p_address: p.road_address_name || p.address_name,
       p_latitude: Number(p.y),
       p_longitude: Number(p.x),
-      p_category: guessCategory(p.category_name),
+      p_category: guessCategory(p.category_name, p.place_name),
     });
     setBusy(null);
     if (error) {

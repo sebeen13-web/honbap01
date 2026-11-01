@@ -758,4 +758,22 @@ begin
 end $$;
 reset role;
 
+
+-- =====================================================================
+-- 9) 음식 종류 (15개)
+-- =====================================================================
+do $$
+declare n int;
+begin
+  select cardinality(public.valid_categories()) into n;
+  raise notice '% 음식 종류 15개 (%)', case when n = 15 then 'PASS' else 'FAIL' end, n;
+  insert into public.restaurants (name, address, latitude, longitude, category) values ('종류 테스트', '안산', 37.31, 126.83, '국밥·순대');
+  raise notice 'PASS 새 음식 종류(국밥·순대) 저장 가능';
+  begin
+    insert into public.restaurants (name, address, latitude, longitude, category) values ('종류 테스트2', '안산', 37.31, 126.83, '피자');
+    raise notice 'FAIL 목록에 없는 종류가 저장됨';
+  exception when check_violation then raise notice 'PASS 목록에 없는 종류는 거부';
+  end;
+end $$;
+
 rollback;

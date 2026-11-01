@@ -19,6 +19,7 @@ supabase/
   migrations/20261103000000_customer_accounts.sql  # 손님 로그인: 역할 user/owner/admin, 닉네임, 즐겨찾기, 확인=user_id 기준, 탈퇴
   migrations/20261104000000_home_and_requests.sql  # 카카오 장소 id, 식당 요청·+1, nearby 에 등록일
   migrations/20261106000000_owner.sql  # 사장님 등록·수정 함수, 카카오 장소 조회
+  migrations/20261107000000_more_categories.sql  # 음식 종류 15개 (valid_categories())
 docs/ROADMAP.md                        # 차별점과 3~6단계 화면 명세 (이후 단계는 이 문서를 따른다)
 src/
   app/                                 # 라우트 (/, /restaurants/[id], /owner, /admin ...)
@@ -181,3 +182,10 @@ psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f supabase/tests/r
 - 대시보드(`/owner`): 최근 7·30일 상세 조회·길찾기·전화, ‘오늘도 됐어요’ 집계, 내 식당 요청 수, 연결 요청 상태, 일시중단.
 - 스티커(`/owner/sticker`): A4 1쪽 큰 스티커 + 1쪽 작은 스티커 8개(90×60mm), 식당 상세로 가는 QR.
   **QR 주소는 `NEXT_PUBLIC_SITE_URL`(배포 주소)** 을 쓴다. 비워 두면 지금 접속한 주소(localhost)라 손님 휴대폰에서 열리지 않는다.
+
+## 음식 종류
+
+15개: 고깃집 · 곱창·막창 · 닭갈비·찜닭 · 족발·보쌈 · 샤브샤브 · 전골·찜·탕 · 회 · 해산물·조개구이 · 중식 요리 · 국밥·순대 · 돈가스·경양식 · 국수·칼국수 · 찌개·백반 · 분식 · 기타
+
+바꾸려면 **두 곳을 같이** 고친다: DB 함수 `public.valid_categories()`(새 마이그레이션으로 `create or replace`) 와 `src/lib/constants.ts` 의 `CATEGORIES`·`CATEGORY_ICON`, 타입 `Category`.
+카카오 분류로 종류를 추정하는 규칙은 `src/features/requests/place-search.ts` 의 `guessCategory`.

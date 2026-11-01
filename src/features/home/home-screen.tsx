@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { CATEGORIES } from "@/lib/constants";
+import { CATEGORIES, CATEGORY_ICON } from "@/lib/constants";
 import { EMPTY_FILTERS } from "@/features/restaurants/filters";
 import { RestaurantCard } from "@/features/restaurants/restaurant-card";
 import { LocationBar } from "@/features/nearby/location-bar";
@@ -14,7 +14,6 @@ import type { Category, NearbyRestaurant } from "@/types/database";
 
 const SECTION_MAX = 8;
 const NEW_DAYS = 14;
-const CATEGORY_ICON: Record<Category, string> = { 고깃집: "🥩", 샤브샤브: "🍲", 회: "🐟", 기타: "🍚" };
 
 type Section = { key: string; title: string; rows: NearbyRestaurant[] };
 
@@ -131,18 +130,18 @@ export function HomeScreen() {
       ) : (
         <>
           {/* 음식 종류 */}
-          <nav aria-label="음식 종류로 지도 보기" className="mt-5 grid grid-cols-4 gap-2">
+          <nav aria-label="음식 종류로 지도 보기" className="mt-5 grid grid-cols-5 gap-x-1 gap-y-2">
             {CATEGORIES.map((c) => (
               <button
                 key={c}
                 type="button"
                 onClick={() => goMapWithCategory(c)}
-                className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-2xl border border-gray-200 bg-white text-sm font-semibold text-gray-900 hover:border-primary hover:bg-primary-soft"
+                className="flex min-h-[4.5rem] flex-col items-center justify-start gap-1 rounded-2xl px-0.5 pt-2 text-[0.72rem] leading-tight font-semibold break-keep text-gray-900 hover:bg-primary-soft"
               >
-                <span aria-hidden className="text-2xl">
+                <span aria-hidden className="grid size-11 place-items-center rounded-2xl bg-gray-50 text-2xl ring-1 ring-gray-200">
                   {CATEGORY_ICON[c]}
                 </span>
-                {c}
+                <span className="text-center">{c}</span>
               </button>
             ))}
           </nav>

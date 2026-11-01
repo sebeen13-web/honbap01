@@ -6,7 +6,23 @@
  */
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
-export type Category = "고깃집" | "샤브샤브" | "회" | "기타";
+/** 음식 종류. DB 의 valid_categories() 와 같은 값 (src/lib/constants.ts CATEGORIES 순서) */
+export type Category =
+  | "고깃집"
+  | "곱창·막창"
+  | "닭갈비·찜닭"
+  | "족발·보쌈"
+  | "샤브샤브"
+  | "전골·찜·탕"
+  | "회"
+  | "해산물·조개구이"
+  | "중식 요리"
+  | "국밥·순대"
+  | "돈가스·경양식"
+  | "국수·칼국수"
+  | "찌개·백반"
+  | "분식"
+  | "기타";
 export type TimeSlot = "all_day" | "lunch" | "dinner" | "custom";
 export type PolicySource = "admin_checked" | "owner_registered";
 /** user = 손님(가입 기본값), owner = 사장님(서버가 승격), admin = 관리자(DB 에서 직접 지정) */
