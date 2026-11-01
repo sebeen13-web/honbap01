@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requireAdmin } from "@/features/admin/guard";
 import { getKakaoAppKey } from "@/lib/env";
-import { ANSAN_RESEARCH } from "@/features/admin/import/ansan-research";
+import { ALL_RESEARCH } from "@/features/admin/import/all-research";
 import { ImportScreen } from "@/features/admin/import/import-screen";
 
 export const metadata: Metadata = { title: "조사 식당 일괄 등록 - 혼밥 지도 관리자" };
@@ -18,9 +18,9 @@ export default async function AdminImportPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">조사 식당 일괄 등록 ({ANSAN_RESEARCH.length}곳)</h1>
+        <h1 className="text-xl font-bold text-gray-900">조사 식당 일괄 등록 ({ALL_RESEARCH.length}곳)</h1>
         <p className="mt-1 text-sm text-gray-700">
-          안산에서 1인분 주문이 된다는 근거(메뉴판·후기)를 찾은 식당이에요. 가격은 자료가 올라온 시점 기준이라 지금과 다를 수 있어요.
+          안산(대부도 포함)에서 혼밥·1인분 주문 근거(메뉴판·후기)를 찾은 식당이에요. 1차 23곳 + 2차 생활 식당. 가격은 자료가 올라온 시점 기준이라 지금과 다를 수 있어요.
         </p>
         <ol className="mt-2 list-decimal pl-5 text-sm text-gray-700">
           <li>‘카카오에서 위치 찾기’를 누르면 가게마다 카카오맵 후보가 나와요.</li>

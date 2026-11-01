@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/features/admin/guard";
 import { restaurantFormSchema } from "@/features/restaurants/schema";
-import { ANSAN_RESEARCH } from "@/features/admin/import/ansan-research";
+import { ALL_RESEARCH } from "@/features/admin/import/all-research";
 
 export type ImportResult = { ok: true; status: "created" } | { ok: false; status: "exists" | "error"; message: string };
 
@@ -20,13 +20,13 @@ const placeSchema = z.object({
 
 /**
  * 조사 목록의 식당 하나를 등록한다.
- * 메뉴·가격·시간 규칙은 서버의 조사 목록(ANSAN_RESEARCH)에서 key 로 가져오고,
+ * 메뉴·가격·시간 규칙은 서버의 조사 목록(ALL_RESEARCH)에서 key 로 가져오고,
  * 클라이언트에서는 위치 정보(카카오 장소)만 받는다. 저장은 기존 admin_save_restaurant 로(출처 = 관리자 확인).
  */
 export async function importResearchItemAction(key: string, place: unknown): Promise<ImportResult> {
   const { supabase } = await requireAdmin();
 
-  const item = ANSAN_RESEARCH.find((x) => x.key === key);
+  const item = ALL_RESEARCH.find((x) => x.key === key);
   if (!item) return { ok: false, status: "error", message: "조사 목록에 없는 식당이에요." };
   const p = placeSchema.safeParse(place);
   if (!p.success) return { ok: false, status: "error", message: "카카오 장소 정보가 올바르지 않아요." };

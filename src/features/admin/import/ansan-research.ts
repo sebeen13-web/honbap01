@@ -32,9 +32,13 @@ export type ResearchItem = {
   query: string;
   /** 검색 결과의 가게 이름에 반드시 들어가야 하는 말 (띄어쓰기 무시) */
   mustInclude: string;
+  /** 1차 검색에서 못 찾으면 차례로 다시 찾아볼 검색어 */
+  altQueries?: string[];
   category: Category;
   menus: ResearchMenu[];
   time_rules?: ResearchRule[];
+  /** 동네 이름(예: "사동"). 체인점이면 주소에 이 말이 들어간 후보를 먼저 고른다 */
+  areaHint?: string;
   /** 조사 메모 (관리자 화면에만 표시) */
   memo: string;
   sources: string[];
@@ -100,6 +104,7 @@ export const ANSAN_RESEARCH: ResearchItem[] = [
   {
     key: "shabuway",
     query: "샤브웨이 안산",
+    altQueries: ["샤브웨이"],
     mustInclude: "샤브웨이",
     category: "샤브샤브",
     menus: [
@@ -129,6 +134,7 @@ export const ANSAN_RESEARCH: ResearchItem[] = [
   {
     key: "honsam-sangroksu",
     query: "혼삼 상록수점",
+    altQueries: ["혼삼 안산"],
     mustInclude: "혼삼",
     category: "고깃집",
     menus: [
@@ -141,6 +147,7 @@ export const ANSAN_RESEARCH: ResearchItem[] = [
   {
     key: "sanyacho-galbi",
     query: "산야초갈비이야기",
+    altQueries: ["산야초 갈비 안산", "산야초 선부동"],
     mustInclude: "산야초",
     category: "고깃집",
     menus: [
@@ -172,6 +179,7 @@ export const ANSAN_RESEARCH: ResearchItem[] = [
   {
     key: "choigane-jokbal",
     query: "최가네장충왕족발보쌈",
+    altQueries: ["최가네 족발 안산", "최가네왕족발"],
     mustInclude: "최가네",
     category: "족발·보쌈",
     menus: [{ name: "1인분 마늘보쌈세트", solo_price: 22000, normal_min_servings: 2 }],
@@ -249,6 +257,7 @@ export const ANSAN_RESEARCH: ResearchItem[] = [
   {
     key: "eomcheong-hoe",
     query: "엄청난회집 안산",
+    altQueries: ["엄청난회"],
     mustInclude: "엄청난회",
     category: "회",
     menus: [
@@ -272,7 +281,8 @@ export const ANSAN_RESEARCH: ResearchItem[] = [
   },
   {
     key: "jungguksung-wadong",
-    query: "중국성 안산 와동",
+    query: "중국성 와동",
+    altQueries: ["중국성 안산"],
     mustInclude: "중국성",
     category: "중식 요리",
     menus: [{ name: "탕수육+짜장(1인)", solo_price: 21000, normal_min_servings: 2, note: "2인 세트도 있음" }],
@@ -320,5 +330,199 @@ export const ANSAN_RESEARCH: ResearchItem[] = [
     ],
     memo: "단원구 고잔로 108 205호. '혼밥하기 딱 좋은 1인 훠궈 무한리필', 1인 1팟.",
     sources: ["https://www.threads.com/@mr_hyung_story/post/DTcXp88gbhc"],
+  },
+  // ── 2차 조사 (안산 전역, 2026-11) ──────────────────────────────
+  {
+    key: "bultaneun-jjamppong-bono",
+    query: "불타는짬뽕 본오동점",
+    mustInclude: "불타는짬뽕",
+    category: "중식 요리",
+    menus: [{ name: "짜장+1인 탕수육 세트", solo_price: 11000, normal_min_servings: 2 }],
+    memo: "본오동 먹자골목. 혼밥 후기 많음, 1인 탕수육 세트.",
+    sources: [dc("exb8XHpydJBn")],
+  },
+  {
+    key: "choburi-kimchi-gojan",
+    query: "초부리김치찌개 고잔본점",
+    mustInclude: "초부리",
+    category: "찌개·백반",
+    menus: [
+      {
+        name: "1인분 솥밥+김치찌개",
+        solo_price: 11000,
+        regular_price_per_person: 13000,
+        normal_min_servings: 2,
+        note: "3인 39,000원(1인당 13,000원), 1인 1솥밥",
+      },
+    ],
+    memo: "매장 식사 1인분 솥밥+김치찌개 11,000원.",
+    sources: [dc("rHZKapYYtwVg")],
+  },
+  {
+    key: "cheongnyeon-jjigae-gojan",
+    query: "청년찌개 안산고잔점",
+    mustInclude: "청년찌개",
+    category: "찌개·백반",
+    menus: [{ name: "김치찌개 1인+공기밥 세트", solo_price: 15000, normal_min_servings: 2, note: "돼지·참치·부대·대패 중 선택" }],
+    memo: "김치찌개 1인 세트 메뉴.",
+    sources: [dc("7PZCbtHl7eQt")],
+  },
+  {
+    key: "deumbaki-wolpi",
+    query: "듬박이김치찌개의집 안산월피점",
+    mustInclude: "듬박이",
+    category: "찌개·백반",
+    menus: [{ name: "김치찌개 1인분", solo_price: 9000, normal_min_servings: 2, note: "9,000원부터" }],
+    memo: "월피동. 가게 정보에 김치찌개 1인분 9,000원~. 11:00~22:00.",
+    sources: ["https://www.daangn.com/kr/local-profile/%EB%93%AC%EB%B0%95%EC%9D%B4%EA%B9%80%EC%B9%98%EC%B0%8C%EA%B0%9C%EC%9D%98%EC%A7%91-%EC%95%88%EC%82%B0%EC%9B%94%ED%94%BC%EC%A0%90-32evjeak1sti/"],
+  },
+  {
+    key: "igane-cheolpan-gopchang",
+    query: "이가네철판야채곱창",
+    mustInclude: "이가네",
+    category: "곱창·막창",
+    menus: [
+      {
+        name: "곱창·순대 야채볶음 1인분",
+        solo_price: 10000,
+        regular_price_per_person: 9000,
+        normal_min_servings: 2,
+        note: "2인분 18,000원",
+      },
+    ],
+    memo: "메뉴판에 1인분 10,000 / 2인분 18,000.",
+    sources: [dc("Y4YVgdhFGXvt")],
+  },
+  {
+    key: "yetmat-ajimae-sundae",
+    query: "옛맛아지매순대 월피동",
+    mustInclude: "옛맛아지매",
+    altQueries: ["옛맛아지매순대"],
+    category: "국밥·순대",
+    menus: [{ name: "순대곱창볶음(1인)", solo_price: 11000, normal_min_servings: 2 }],
+    memo: "월피동. 순대곱창볶음 1인 메뉴.",
+    sources: ["https://www.diningcode.com/list.dc?query=%EC%95%88%EC%82%B0++%EA%B3%B1%EC%B0%BD%EB%B3%B6%EC%9D%8C"],
+  },
+  {
+    key: "yugane-ansan-jungang",
+    query: "유가네닭갈비 안산중앙점",
+    mustInclude: "유가네닭갈비안산중앙",
+    category: "닭갈비·찜닭",
+    menus: [{ name: "닭갈비 1인분", solo_price: 11500, normal_min_servings: 2, note: "11,500원부터, 1인분 주문 된다는 후기" }],
+    memo: "혼밥·칸막이 태그, 1인석. 후기: '1인분 주문이 된다고 해서' 1인분 주문. 11:00~23:00.",
+    sources: [dc("SoGITu77tg9b"), "https://www.daangn.com/kr/local-profile/%EC%9C%A0%EA%B0%80%EB%84%A4%EB%8B%AD%EA%B0%88%EB%B9%84-%EC%95%88%EC%82%B0%EC%A4%91%EC%95%99%EC%A0%90-w7uwtezji7md/"],
+  },
+  {
+    key: "kkotgerang-boribap",
+    query: "꽃게랑보리밥 안산",
+    mustInclude: "꽃게랑",
+    category: "찌개·백반",
+    menus: [{ name: "보리밥정식(1인)", solo_price: 15000, normal_min_servings: 2 }],
+    memo: "메뉴판에 보리밥정식(1인) 15,000원.",
+    sources: [dc("3CRBsd8c0isb")],
+  },
+  {
+    key: "agu-deumppuk",
+    query: "아구듬뿍&알곤마니 안산",
+    mustInclude: "아구듬뿍",
+    altQueries: ["아구듬뿍"],
+    category: "전골·찜·탕",
+    menus: [{ name: "점심특선 아구찜 1인", solo_price: 12000, normal_min_servings: 2, note: "점심특선(후기)" }],
+    time_rules: [
+      { day_type: "all", start_time: "11:00", end_time: "14:30", available: true, note: "점심특선" },
+      { day_type: "all", start_time: "14:30", end_time: "16:30", available: false, note: "브레이크 타임" },
+    ],
+    memo: "후기: '아구찜을 1인 1만2천원에(점심특선)'. 11:00~22:00, 브레이크 14:30~16:30. 혼밥 키워드.",
+    sources: [dc("w7Phs0W0n5IM")],
+  },
+  {
+    key: "jongno-gamjatang-seonbu",
+    query: "종로해장국감자탕 선부",
+    mustInclude: "종로해장국",
+    altQueries: ["종로해장국감자탕 안산"],
+    category: "전골·찜·탕",
+    menus: [{ name: "1인 세트(뼈해장국+감자탕볶음밥)", solo_price: 18000, normal_min_servings: 2, note: "감자탕은 보통 2인 이상" }],
+    memo: "선부2동. 1인 세트 메뉴, '점심에 혼밥 손님 많다' 후기.",
+    sources: [dc("QaZwuaJGo7Hz")],
+  },
+  {
+    key: "gajang-jokbal-singil",
+    query: "가장맛있는족발 안산신길점",
+    mustInclude: "가장맛있는족발안산신길",
+    category: "족발·보쌈",
+    menus: [
+      { name: "실속족발+쟁반국수(1인)", solo_price: 29000, normal_min_servings: 2, note: "양은 1~2인분" },
+      { name: "실속불족발+쟁반국수(1인)", solo_price: 29000, normal_min_servings: 2 },
+    ],
+    memo: "1인 실속 세트. 영업 14:00~01:00 표기.",
+    sources: [dc("nZFUFYE9YGnB")],
+  },
+  {
+    key: "choijunghee-nakji",
+    query: "최정희낙지마당 안산",
+    mustInclude: "최정희",
+    category: "해산물·조개구이",
+    menus: [{ name: "낙지볶음 1인분", solo_price: 13000, normal_min_servings: 2, note: "산낙지전골·연포탕은 2인 이상" }],
+    memo: "후기: '낙지볶음 1인분만 주문'(포장 14,000원).",
+    sources: [dc("PLmWEdzJYpCT")],
+  },
+  {
+    key: "doojjim-wolpi",
+    query: "두찜 안산월피점",
+    mustInclude: "두찜",
+    category: "닭갈비·찜닭",
+    menus: [{ name: "까만찜닭 반마리", solo_price: 20800, normal_min_servings: 2, note: "매장 소개 '혼자서도 즐기는 두찜'" }],
+    memo: "월피동. 반마리 메뉴. 11:00~23:00.",
+    sources: [dc("RLoGvgIrDzTN")],
+  },
+  {
+    key: "sinseon-shabu-kalguksu",
+    query: "신선샤브&칼국수 안산",
+    mustInclude: "신선샤브",
+    category: "샤브샤브",
+    menus: [
+      { name: "얼큰 소고기샤브 1인 세트", solo_price: 12500, normal_min_servings: 2, note: "야채·소고기 100g·칼국수·볶음밥" },
+      { name: "칼국수 세트", solo_price: 9000, normal_min_servings: 1 },
+    ],
+    memo: "상록구 성안1길 20. 1인 세트 운영.",
+    sources: ["https://mom-mom.net/travel/places/6a10285f1fddc94bc514cb63"],
+  },
+  {
+    key: "imone-saengseon",
+    query: "이모네생선구이 안산",
+    mustInclude: "이모네생선",
+    category: "해산물·조개구이",
+    menus: [
+      { name: "고등어구이", solo_price: 11000, normal_min_servings: 1, note: "구이·볶음은 1인 주문 가능, 조림은 2인 이상" },
+      { name: "갈치구이", solo_price: 14000, normal_min_servings: 1 },
+    ],
+    memo: "이동. 구이·볶음 1인 가능, 조림은 2인부터. 혼밥 후기.",
+    sources: [dc("k2uuD0xNwLW3")],
+  },
+  {
+    key: "hakchang-tteokbokki",
+    query: "학창시절 즉석떡볶이",
+    mustInclude: "학창시절",
+    category: "분식",
+    menus: [
+      {
+        name: "즉석떡볶이 1인분",
+        solo_price: 9900,
+        regular_price_per_person: 8000,
+        normal_min_servings: 2,
+        note: "2인 16,000원부터, 화요일 휴무",
+      },
+    ],
+    memo: "본오동. 가게 정보에 '1인 방문 시 1인 주문 가능'.",
+    sources: [dc("6C2glgELlhjN"), "https://www.daangn.com/kr/local-profile/%ED%95%99%EC%B0%BD%EC%8B%9C%EC%A0%88-%EC%A6%89%EC%84%9D%EB%96%A1%EB%B3%B6%EC%9D%B4-xuwsmrnq4px4/"],
+  },
+  {
+    key: "ayajin-dongtae",
+    query: "아야진동태탕 안산점",
+    mustInclude: "아야진",
+    category: "전골·찜·탕",
+    menus: [{ name: "동태탕 1인", solo_price: 13000, normal_min_servings: 2, note: "공기밥 포함, 1인 1메뉴" }],
+    memo: "고잔동. 동태탕 1인 13,000원(1인 1메뉴).",
+    sources: [dc("horvJGhTgr52")],
   },
 ];

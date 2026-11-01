@@ -4,7 +4,8 @@ import { useState } from "react";
 import { DEFAULT_CENTER } from "@/lib/constants";
 import { searchRestaurantsOnKakao } from "@/features/requests/place-search";
 import type { KakaoPlaceResult } from "@/features/map/kakao-types";
-import { ANSAN_RESEARCH, type ResearchItem } from "@/features/admin/import/ansan-research";
+import type { ResearchItem } from "@/features/admin/import/ansan-research";
+import { ALL_RESEARCH } from "@/features/admin/import/all-research";
 import { importResearchItemAction } from "@/features/admin/import/actions";
 
 type Row = {
@@ -18,9 +19,15 @@ type Row = {
 
 const norm = (s: string) => s.replace(/\s/g, "").toLowerCase();
 
-/** 안산 안의 음식점 중 이름에 mustInclude 가 들어간 것만 후보로 */
+/**
+ * 안산 안의 가게 중 이름에 mustInclude 가 들어간 것만 후보로.
+ * 동네 힌트(areaHint)가 있으면 그 동네 주소인 후보를 앞으로 (체인점 지점 고르기).
+ */
 function filterCandidates(item: ResearchItem, found: KakaoPlaceResult[]) {
-  return found.filter((p) => /안산/.test(p.address_name) && norm(p.place_name).includes(norm(item.mustInclude))).slice(0, 5);
+  const ok = found.filter((p) => /안산/.test(p.address_name) && norm(p.place_name).includes(norm(item.mustInclude)));
+  const hint = item.areaHint;
+  const inArea = (p: KakaoPlaceResult) => !!hint && `${p.address_name} ${p.road_address_name}`.includes(hint);
+  return [...ok.filter(inArea), ...ok.filter((p) => !inArea(p))].slice(0, 5);
 }
 
 export function ImportScreen({ kakaoAppKey, existingPlaceIds }: { kakaoAppKey: string | null; existingPlaceIds: string[] }) {
@@ -34,16 +41,25 @@ export function ImportScreen({ kakaoAppKey, existingPlaceIds }: { kakaoAppKey: s
   async function searchAll() {
     if (!kakaoAppKey) return;
     setBusy("search");
-    for (const item of ANSAN_RESEARCH) {
+    // 체인점 등에서 같은 카카오 장소가 두 가게에 기본 선택되지 않게
+    const used = new Set<string>();
+    for (const item of ALL_RESEARCH) {
       update(item.key, { search: "searching" });
       try {
-        const found = await searchRestaurantsOnKakao(kakaoAppKey, item.query, DEFAULT_CENTER, { onlyRestaurants: false });
-        const candidates = filterCandidates(item, found);
-        const first = candidates[0];
+        // 못 찾으면 다른 검색어로 다시 (가게 이름·지점명 표기가 조사 자료와 다를 수 있다)
+        let candidates: KakaoPlaceResult[] = [];
+        for (const q of [item.query, ...(item.altQueries ?? []), `${item.mustInclude} 안산`]) {
+          const found = await searchRestaurantsOnKakao(kakaoAppKey, q, DEFAULT_CENTER, { onlyRestaurants: false });
+          candidates = filterCandidates(item, found);
+          if (candidates.length) break;
+        }
+        const first = candidates.find((c) => !used.has(c.id));
+        // 이미 등록된 장소는 기본으로 건너뛴다
+        const pick = first && !existing.has(first.id) ? first.id : "";
+        if (pick) used.add(pick);
         update(item.key, {
           candidates,
-          // 이미 등록된 장소는 기본으로 건너뛴다
-          pick: first && !existing.has(first.id) ? first.id : "",
+          pick,
           search: "done",
         });
       } catch {
@@ -55,7 +71,7 @@ export function ImportScreen({ kakaoAppKey, existingPlaceIds }: { kakaoAppKey: s
 
   async function saveAll() {
     setBusy("save");
-    for (const item of ANSAN_RESEARCH) {
+    for (const item of ALL_RESEARCH) {
       const row = rows[item.key];
       const place = row?.candidates.find((c) => c.id === row.pick);
       if (!row || !place || row.save === "created") continue;
@@ -73,8 +89,8 @@ export function ImportScreen({ kakaoAppKey, existingPlaceIds }: { kakaoAppKey: s
     setBusy("");
   }
 
-  const picked = ANSAN_RESEARCH.filter((i) => rows[i.key]?.pick).length;
-  const created = ANSAN_RESEARCH.filter((i) => rows[i.key]?.save === "created").length;
+  const picked = ALL_RESEARCH.filter((i) => rows[i.key]?.pick).length;
+  const created = ALL_RESEARCH.filter((i) => rows[i.key]?.save === "created").length;
 
   if (!kakaoAppKey) {
     return <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">카카오 지도 키(NEXT_PUBLIC_KAKAO_MAP_APP_KEY)가 없어 장소를 찾을 수 없어요.</p>;
@@ -93,7 +109,7 @@ export function ImportScreen({ kakaoAppKey, existingPlaceIds }: { kakaoAppKey: s
       </div>
 
       <ol className="space-y-3">
-        {ANSAN_RESEARCH.map((item, idx) => {
+        {ALL_RESEARCH.map((item, idx) => {
           const row = rows[item.key];
           return (
             <li key={item.key} className="rounded-2xl border border-gray-200 bg-white p-4">
