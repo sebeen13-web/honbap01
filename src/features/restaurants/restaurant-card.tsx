@@ -21,8 +21,9 @@ export const RestaurantCard = forwardRef<
   HTMLLIElement,
   { restaurant: NearbyRestaurant; selected: boolean; onSelect: () => void }
 >(function RestaurantCard({ restaurant: r, selected, onSelect }, ref) {
-  const menus = r.solo_menus.slice(0, MENU_PREVIEW).join(" · ");
-  const more = r.solo_menus.length - MENU_PREVIEW;
+  // 가격·인분 표시는 docs/ROADMAP.md 의 [3단계 손님 메인] 명세로 다음 개편 때 바꾼다. 지금은 메뉴 이름만.
+  const menus = r.menus.slice(0, MENU_PREVIEW).map((m) => m.name).join(" · ");
+  const more = r.menus.length - MENU_PREVIEW;
 
   return (
     <li

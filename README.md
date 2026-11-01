@@ -13,7 +13,10 @@ supabase/
   migrations/20261031000000_init.sql   # 테이블 + RLS + 함수 (nearby_restaurants 등)
   migrations/20261101000000_admin_save_restaurant.sql  # 관리자 식당+정책 저장 함수 (2단계)
   migrations/20261101000100_revoke_anon_helpers.sql    # 비로그인의 is_admin/owns_restaurant 직접 호출 차단
-  seed.sql                             # 로컬용 가상 샘플 식당 4곳 (안산 중앙역 주변)
+  migrations/20261102000000_menus_time_rules_confirmations.sql  # 1인분 메뉴·가격, 시간대 규칙, 원탭 확인, 연결 요청, 통계
+  seed.sql                             # 샘플 식당 4곳 (메뉴·가격·시간대 규칙·확인·통계 포함)
+  tests/rls_checks.sql                 # 역할별 권한 + 시간대 규칙 점검 (rollback 되어 데이터 안 남음)
+docs/ROADMAP.md                        # 차별점과 3~6단계 화면 명세 (이후 단계는 이 문서를 따른다)
 src/
   app/                                 # 라우트 (/, /restaurants/[id], /owner, /admin ...)
   app/page.tsx                         # 손님 메인: 지도 + 목록 시트 + 필터 (3단계)
@@ -33,7 +36,12 @@ src/
 |---|---|
 | `profiles` | 가입 시 자동 생성, `role` = owner(기본) / admin. 역할 변경은 관리자만 |
 | `restaurants` | `location`(geography) 은 위도·경도로 자동 계산되는 생성 컬럼 + GIST 인덱스. `business_hours`(jsonb) 로 '영업 중' 판단. `owner_id` unique → 사장님당 1개 |
-| `solo_policies` | 식당당 1개. `is_active=false` = 사장님 일시중단 **또는** 관리자 숨김. `source`/`last_verified_at` 은 트리거가 로그인 역할로 결정 (클라이언트 값 무시) |
+| `solo_policies` | 식당당 1개. `is_active=false` = 사장님 일시중단 **또는** 관리자 숨김. `source`/`last_verified_at` 은 트리거가 로그인 역할로 결정 (클라이언트 값 무시). 메뉴·시간대 규칙을 저장해도 갱신, `is_active` 만 바꾸면 유지 |
+| `solo_menu_items` | 1인분 메뉴·가격 (식당당 최대 10개). `solo_price` 1인분 가격, `regular_price_per_person` 보통 1인당 가격, `normal_min_servings` 원래 최소 인분 |
+| `solo_time_rules` | 평일/주말/매일 × 시작~종료 × 가능/불가 (최대 8개). 겹치면 불가 우선, 자정 넘김 지원, 한국 시간. 규칙 없으면 null |
+| `solo_confirmations` | "오늘도 됐어요/안 됐어요". `visitor_hash` 만 저장(원본 IP·위치 없음), 하루 1회. 등록은 서버 API(service_role)만 |
+| `restaurant_claims` | 사장님 "내 식당으로 연결 요청" → 관리자 승인 시 `restaurants.owner_id` 설정 |
+| `restaurant_daily_stats` | 식당별 일자별 조회·길찾기·전화 수. `increment_restaurant_stat()` 로만 증가, 사장님은 자기 식당만 읽기 |
 | `reports` | 손님 정보 없이 식당 id + 사유만. 누구나 등록, 읽기는 관리자만 |
 
 `business_hours` 형식: `{"mon":{"open":"11:00","close":"22:00"}, "sun":null, ...}` — `null` 은 휴무, `close <= open` 은 자정 넘김, `open = close` 는 24시간.
@@ -92,3 +100,28 @@ select u.email, p.role from public.profiles p join auth.users u on u.id = p.id;
 - 위치를 거부하거나 실패하면 동네 검색(카카오 주소/키워드)으로 기준점을 고른다.
 - 손님 좌표는 `nearby_restaurants` 요청 본문(POST)에만 쓰고, 서버·localStorage·쿠키·콘솔 어디에도 남기지 않는다.
 - 위치 기능은 https 주소나 `localhost` 에서만 동작한다. 휴대폰으로 PC 개발 서버(`http://192.168...`)에 접속하면 위치가 막히므로, 휴대폰 확인은 배포 주소(https)나 동네 검색으로 한다.
+
+## 오래된 확인 데이터 정리 (90일)
+
+`solo_confirmations` 는 90일이 지나면 지운다. 지금은 수동으로 실행한다(6단계에서 자동화 점검).
+
+- Supabase 대시보드 → **SQL Editor** 에서:
+
+```sql
+select public.purge_old_confirmations();        -- 지운 행 수를 돌려준다 (기본 90일)
+-- 같은 내용을 직접 쓰려면:
+-- delete from public.solo_confirmations where created_at < now() - interval '90 days';
+```
+
+- 로컬: `psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -c "select public.purge_old_confirmations();"`
+
+이 함수는 손님·사장님·관리자 계정에서 API 로 부를 수 없다(SQL Editor / service_role 전용).
+
+## 권한 점검 스크립트
+
+```bash
+npx supabase db reset
+psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f supabase/tests/rls_checks.sql
+```
+
+`PASS` / `FAIL` 이 한 줄씩 찍힌다. 한 트랜잭션 안에서 실행하고 rollback 하므로 데이터가 남지 않는다.

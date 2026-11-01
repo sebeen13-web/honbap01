@@ -34,3 +34,12 @@
 - `restaurants/bottom-sheet.tsx` — 접힘/중간/펼침 3단계 시트 (끌기·탭·키보드)
 - `restaurants/filter-bar.tsx`, `restaurants/filters.ts` — 필터 칩과 클라이언트 필터 로직
 - `restaurants/restaurant-card.tsx`, `restaurants/format.ts` — 목록 카드, 거리 표기(350m / 1.2km)
+
+## 차별점 DB 반영 때 만든 파일
+
+- `restaurants/editors/menu-items-editor.tsx` — 1인분 메뉴·가격 행 편집 (관리자 폼, 5단계 사장님 폼에서 재사용)
+- `restaurants/editors/time-rules-editor.tsx` — 시간대 규칙 행 편집
+- `restaurants/editors/price-input.tsx` — 천 단위 쉼표 가격 입력
+- `restaurants/schema.ts` — `menuItemSchema`, `timeRuleSchema` 추가 (클라이언트·서버 공용)
+
+이후 화면 명세는 `docs/ROADMAP.md` 를 따른다.

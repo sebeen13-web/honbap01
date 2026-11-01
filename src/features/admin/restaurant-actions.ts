@@ -16,6 +16,7 @@ const idSchema = z.guid("잘못된 식당 id 입니다.");
  * - 클라이언트에서 검증했더라도 서버에서 같은 zod 스키마로 다시 검증한다.
  * - source(admin_checked)·last_verified_at(now) 은 클라이언트에서 받지 않고
  *   DB 함수(admin_save_restaurant)와 트리거가 결정한다.
+ * - 메뉴·시간대 규칙은 저장할 때마다 폼의 목록으로 통째로 교체된다.
  * 성공하면 목록으로 이동하고, 실패하면 메시지를 돌려준다.
  */
 export async function saveRestaurantAction(id: string | null, input: unknown): Promise<SaveRestaurantResult> {
@@ -43,18 +44,24 @@ export async function saveRestaurantAction(id: string | null, input: unknown): P
     p_phone: v.phone,
     p_category: v.category,
     p_business_hours: v.business_hours,
-    p_solo_menus: v.solo_menus,
     p_time_slot: v.time_slot,
     p_time_slot_note: v.time_slot_note,
     p_extra_fee: v.extra_fee,
     p_extra_fee_note: v.extra_fee_note,
+    // 순서대로 sort_order 가 매겨진다
+    p_menus: v.menus,
+    p_time_rules: v.time_rules,
   });
 
   if (error) {
     console.error("[admin_save_restaurant]", error);
     if (error.code === "42501") return { ok: false, message: "관리자 권한이 없어 저장하지 못했어요. 다시 로그인해 주세요." };
     if (error.code === "P0002") return { ok: false, message: "식당을 찾을 수 없어요. 이미 삭제되었을 수 있어요." };
-    if (error.code === "23514") return { ok: false, message: "저장 규칙에 맞지 않는 값이 있어요. 입력값을 다시 확인해 주세요." };
+    if (error.code === "23514") {
+      // DB 가 보낸 한국어 안내(개수 제한 등)는 그대로 보여준다
+      const friendly = /[가-힣]/.test(error.message) ? error.message : "저장 규칙에 맞지 않는 값이 있어요. 입력값을 다시 확인해 주세요.";
+      return { ok: false, message: friendly };
+    }
     return { ok: false, message: "저장하지 못했어요. 잠시 후 다시 시도해 주세요." };
   }
 

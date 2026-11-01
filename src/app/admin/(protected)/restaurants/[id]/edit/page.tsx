@@ -3,7 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { requireAdmin } from "@/features/admin/guard";
-import { RestaurantForm, type RestaurantFormInitial } from "@/features/admin/restaurant-form";
+import { RestaurantForm } from "@/features/admin/restaurant-form";
+import type { RestaurantFormInitial } from "@/features/admin/restaurant-form-values";
+import { newMenuRow, newTimeRuleRow } from "@/features/restaurants/form-rows";
 import { businessHoursSchema } from "@/features/restaurants/schema";
 import { SOURCE_LABEL } from "@/lib/constants";
 import { getKakaoAppKey } from "@/lib/env";
@@ -19,7 +21,8 @@ export default async function EditRestaurantPage({ params }: { params: Promise<{
   const { data: r, error } = await supabase
     .from("restaurants")
     .select(
-      "id, name, address, latitude, longitude, phone, category, business_hours, owner_id, solo_policies(solo_menus, time_slot, time_slot_note, extra_fee, extra_fee_note, is_active, source, last_verified_at)",
+      // 타입 추론을 위해 한 줄 문자열로 둔다
+      "id, name, address, latitude, longitude, phone, category, business_hours, owner_id, solo_policies(time_slot, time_slot_note, extra_fee, extra_fee_note, is_active, source, last_verified_at), solo_menu_items(name, solo_price, regular_price_per_person, normal_min_servings, note, sort_order), solo_time_rules(day_type, start_time, end_time, available, note, sort_order)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -38,7 +41,30 @@ export default async function EditRestaurantPage({ params }: { params: Promise<{
     longitude: r.longitude,
     phone: r.phone ?? "",
     category: r.category,
-    solo_menus: p?.solo_menus?.length ? p.solo_menus : [""],
+    menus: r.solo_menu_items.length
+      ? [...r.solo_menu_items]
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((m) =>
+            newMenuRow({
+              name: m.name,
+              solo_price: String(m.solo_price),
+              regular_price_per_person: m.regular_price_per_person === null ? "" : String(m.regular_price_per_person),
+              normal_min_servings: String(m.normal_min_servings),
+              note: m.note ?? "",
+            }),
+          )
+      : [newMenuRow()],
+    time_rules: [...r.solo_time_rules]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((t) =>
+        newTimeRuleRow({
+          day_type: t.day_type,
+          start_time: t.start_time.slice(0, 5),
+          end_time: t.end_time.slice(0, 5),
+          available: t.available,
+          note: t.note ?? "",
+        }),
+      ),
     time_slot: p?.time_slot ?? "all_day",
     time_slot_note: p?.time_slot_note ?? "",
     extra_fee: p?.extra_fee ?? false,

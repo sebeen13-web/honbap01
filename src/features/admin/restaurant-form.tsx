@@ -5,10 +5,12 @@ import Link from "next/link";
 import { CATEGORIES, TIME_SLOT_LABEL } from "@/lib/constants";
 import { AddressSearch } from "@/features/map/address-search";
 import { saveRestaurantAction } from "@/features/admin/restaurant-actions";
+import { MenuItemsEditor } from "@/features/restaurants/editors/menu-items-editor";
+import { TimeRulesEditor } from "@/features/restaurants/editors/time-rules-editor";
+import type { RestaurantFormInitial } from "@/features/admin/restaurant-form-values";
 import {
   DAY_KEYS,
   DAY_LABEL,
-  MAX_SOLO_MENUS,
   TIME_SLOTS,
   restaurantFormSchema,
   toFieldErrors,
@@ -16,40 +18,10 @@ import {
   type DayKey,
   type FieldErrors,
 } from "@/features/restaurants/schema";
-import type { Category, TimeSlot } from "@/types/database";
+import type { Category } from "@/types/database";
 
 type DayState = { closed: boolean; open: string; close: string };
 type HoursState = Record<DayKey, DayState>;
-
-export type RestaurantFormInitial = {
-  name: string;
-  address: string;
-  latitude: number | null;
-  longitude: number | null;
-  phone: string;
-  category: Category | "";
-  solo_menus: string[];
-  time_slot: TimeSlot;
-  time_slot_note: string;
-  extra_fee: boolean;
-  extra_fee_note: string;
-  business_hours: BusinessHours | null;
-};
-
-export const EMPTY_RESTAURANT: RestaurantFormInitial = {
-  name: "",
-  address: "",
-  latitude: null,
-  longitude: null,
-  phone: "",
-  category: "",
-  solo_menus: [""],
-  time_slot: "all_day",
-  time_slot_note: "",
-  extra_fee: false,
-  extra_fee_note: "",
-  business_hours: null,
-};
 
 function hoursToState(h: BusinessHours | null): HoursState {
   const out = {} as HoursState;
@@ -66,9 +38,6 @@ function stateToHours(s: HoursState): BusinessHours {
   return out;
 }
 
-let menuKeySeq = 0;
-const nextMenuKey = () => `m${++menuKeySeq}`;
-
 export function RestaurantForm({
   restaurantId,
   initial,
@@ -80,7 +49,6 @@ export function RestaurantForm({
   kakaoAppKey: string | null;
 }) {
   const [v, setV] = useState(initial);
-  const [menuKeys, setMenuKeys] = useState(() => initial.solo_menus.map(() => nextMenuKey()));
   const [hoursEnabled, setHoursEnabled] = useState(initial.business_hours !== null);
   const [hours, setHours] = useState<HoursState>(() => hoursToState(initial.business_hours));
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -90,7 +58,7 @@ export function RestaurantForm({
 
   const set = <K extends keyof RestaurantFormInitial>(key: K, value: RestaurantFormInitial[K]) => {
     setV((prev) => ({ ...prev, [key]: value }));
-    // 고친 칸의 오류 문구는 바로 지운다 (solo_menus → solo_menus.0 등 하위 항목 포함)
+    // 고친 칸의 오류 문구는 바로 지운다 (하위 항목 포함)
     setErrors((prev) => {
       const k = String(key);
       const hit = Object.keys(prev).filter((e) => e === k || e.startsWith(`${k}.`));
@@ -101,13 +69,37 @@ export function RestaurantForm({
     });
   };
 
+  const clearErrors = (prefix: string) =>
+    setErrors((prev) => {
+      const hit = Object.keys(prev).filter((e) => e === prefix || e.startsWith(`${prefix}.`));
+      if (hit.length === 0) return prev;
+      const next = { ...prev };
+      hit.forEach((e) => delete next[e]);
+      return next;
+    });
+
   const err = (key: string) => errors[key];
   const errProps = (key: string, id: string) =>
     errors[key] ? { "aria-invalid": true as const, "aria-describedby": `${id}-error` } : {};
 
+  /** 서버로 보낼 값 (행 key 는 빼고 보낸다) */
   function buildPayload() {
     return {
       ...v,
+      menus: v.menus.map((m) => ({
+        name: m.name,
+        solo_price: m.solo_price,
+        regular_price_per_person: m.regular_price_per_person,
+        normal_min_servings: m.normal_min_servings,
+        note: m.note,
+      })),
+      time_rules: v.time_rules.map((r) => ({
+        day_type: r.day_type,
+        start_time: r.start_time,
+        end_time: r.end_time,
+        available: r.available,
+        note: r.note,
+      })),
       business_hours: hoursEnabled ? stateToHours(hours) : null,
     };
   }
@@ -147,7 +139,6 @@ export function RestaurantForm({
     });
   }
 
-  const menuError = err("solo_menus");
   const hoursErrorKeys = Object.keys(errors).filter((k) => k.startsWith("business_hours"));
 
   return (
@@ -252,76 +243,40 @@ export function RestaurantForm({
           <h2 className="text-lg font-semibold">1인분 주문</h2>
 
           <div>
-            <p id="menus-label" className="block text-sm font-medium">
-              1인분 가능 메뉴 <span className="text-primary">*</span>
+            <p className="block text-sm font-medium">
+              1인분 메뉴와 가격 <span className="text-primary">*</span>
             </p>
-            <ul className="mt-2 space-y-2" aria-labelledby="menus-label">
-              {v.solo_menus.map((menu, i) => {
-                const key = `solo_menus.${i}`;
-                return (
-                  <li key={menuKeys[i]}>
-                    <div className="flex gap-2">
-                      <label htmlFor={`menu-${i}`} className="sr-only">
-                        메뉴 {i + 1}
-                      </label>
-                      <input
-                        id={`menu-${i}`}
-                        className="input"
-                        value={menu}
-                        maxLength={50}
-                        placeholder="예: 삼겹살 1인분"
-                        onChange={(e) =>
-                          set(
-                            "solo_menus",
-                            v.solo_menus.map((m, j) => (j === i ? e.target.value : m)),
-                          )
-                        }
-                        {...errProps(key, `menu-${i}`)}
-                      />
-                      <button
-                        type="button"
-                        className="btn-secondary shrink-0"
-                        disabled={v.solo_menus.length <= 1}
-                        aria-label={`메뉴 ${i + 1} 삭제`}
-                        onClick={() => {
-                          set(
-                            "solo_menus",
-                            v.solo_menus.filter((_, j) => j !== i),
-                          );
-                          setMenuKeys((k) => k.filter((_, j) => j !== i));
-                          setErrors({});
-                        }}
-                      >
-                        삭제
-                      </button>
-                    </div>
-                    {err(key) ? (
-                      <p id={`menu-${i}-error`} className="field-error">
-                        {err(key)}
-                      </p>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-            <button
-              type="button"
-              className="btn-secondary mt-2"
-              disabled={v.solo_menus.length >= MAX_SOLO_MENUS}
-              onClick={() => {
-                set("solo_menus", [...v.solo_menus, ""]);
-                setMenuKeys((k) => [...k, nextMenuKey()]);
-              }}
-            >
-              + 메뉴 추가
-            </button>
-            {menuError ? <p className="field-error">{menuError}</p> : null}
+            <p className="mb-2 text-xs text-gray-600">
+              보통 2인분부터 파는 메뉴를 1인분으로 시킬 때의 가격을 적어 주세요. ‘보통 1인당 가격’을 같이 적으면 손님
+              화면에 차액이 표시돼요.
+            </p>
+            <MenuItemsEditor
+              rows={v.menus}
+              onChange={(rows) => setV((prev) => ({ ...prev, menus: rows }))}
+              errors={errors}
+              onClearErrors={clearErrors}
+            />
+          </div>
+
+          <div>
+            <p className="block text-sm font-medium">시간대 규칙</p>
+            <p className="mb-2 text-xs text-gray-600">
+              언제 1인분이 되고 안 되는지 적어 주세요. 겹치면 ‘불가’가 우선이고, 규칙에 없는 시간은 ‘불가’로 봐요. (한국 시간
+              기준, 최대 8개)
+            </p>
+            <TimeRulesEditor
+              rows={v.time_rules}
+              onChange={(rows) => setV((prev) => ({ ...prev, time_rules: rows }))}
+              errors={errors}
+              onClearErrors={clearErrors}
+            />
           </div>
 
           <fieldset>
             <legend className="text-sm font-medium">
-              1인분 가능 시간대 <span className="text-primary">*</span>
+              시간대 요약 <span className="text-primary">*</span>
             </legend>
+            <p className="text-xs text-gray-600">목록에 짧게 보여 줄 요약이에요. 실제 가능 여부는 위 시간대 규칙으로 판단해요.</p>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {TIME_SLOTS.map((slot) => (
                 <label
@@ -360,7 +315,8 @@ export function RestaurantForm({
           </Field>
 
           <fieldset>
-            <legend className="text-sm font-medium">1인 주문 시 추가 요금</legend>
+            <legend className="text-sm font-medium">1인 주문 시 추가 요금 (보조 설명)</legend>
+            <p className="text-xs text-gray-600">차액은 메뉴의 1인분 가격과 보통 1인당 가격으로 자동 계산돼요. 상차림비처럼 따로 받는 돈이 있을 때만 적어 주세요.</p>
             <div className="mt-2 grid grid-cols-2 gap-2">
               {[
                 { value: false, label: "없음" },
@@ -384,7 +340,7 @@ export function RestaurantForm({
           </fieldset>
 
           {v.extra_fee ? (
-            <Field id="extra_fee_note" label="추가 요금 설명" required hint="예: 1인 주문 시 상차림비 2,000원" error={err("extra_fee_note")}>
+            <Field id="extra_fee_note" label="추가 요금 메모" required hint="예: 1인 주문 시 상차림비 2,000원 별도" error={err("extra_fee_note")}>
               <input
                 id="extra_fee_note"
                 className="input"

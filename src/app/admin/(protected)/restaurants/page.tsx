@@ -5,6 +5,7 @@ import { setRestaurantActiveAction } from "@/features/admin/restaurant-actions";
 import { ToggleActiveButton } from "@/features/admin/toggle-active-button";
 import { SOURCE_LABEL } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
+import type { ConfirmationSummary } from "@/types/database";
 
 export const metadata: Metadata = { title: "식당 목록 - 혼밥 지도 관리자" };
 
@@ -34,6 +35,16 @@ export default async function AdminRestaurantsPage({
 
   const rows = data ?? [];
 
+  // 원탭 확인 집계 (최근 30일 ok / not_ok, 최근 14일 not_ok 3건 이상이면 needs_review)
+  const summaries = new Map<string, ConfirmationSummary>();
+  let summaryError = false;
+  if (rows.length > 0) {
+    const { data: sums, error: sumError } = await supabase.rpc("confirmation_summaries", { rids: rows.map((r) => r.id) });
+    if (sumError) summaryError = true;
+    for (const s of sums ?? []) summaries.set(s.restaurant_id, s);
+  }
+  const reviewCount = [...summaries.values()].filter((s) => s.needs_review).length;
+
   return (
     <main>
       <div className="flex items-center justify-between gap-2">
@@ -54,6 +65,15 @@ export default async function AdminRestaurantsPage({
         ) : null}
       </div>
 
+      {reviewCount > 0 ? (
+        <p className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          최근 14일 동안 ‘안 됐어요’ 확인이 3건 이상인 식당이 <strong>{reviewCount}곳</strong> 있어요. 다시 확인해 주세요.
+        </p>
+      ) : null}
+      {summaryError ? (
+        <p className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">확인 집계를 불러오지 못했어요.</p>
+      ) : null}
+
       {error ? (
         <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
           목록을 불러오지 못했어요: {error.message}
@@ -65,6 +85,7 @@ export default async function AdminRestaurantsPage({
           {rows.map((r) => {
             const p = r.solo_policies;
             const active = p?.is_active ?? false;
+            const sum = summaries.get(r.id);
             return (
               <li key={r.id} className="rounded-xl bg-white p-4 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -88,7 +109,18 @@ export default async function AdminRestaurantsPage({
                       >
                         {active ? "공개 중" : "숨김"}
                       </span>
+                      {sum?.needs_review ? (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-900 ring-1 ring-amber-300">
+                          확인 필요
+                        </span>
+                      ) : null}
                     </div>
+                    {sum ? (
+                      <p className="mt-1 text-xs text-gray-700">
+                        최근 30일 확인: 됐어요 <strong>{sum.ok_30d}</strong> · 안 됐어요{" "}
+                        <strong className={sum.not_ok_30d > 0 ? "text-red-700" : undefined}>{sum.not_ok_30d}</strong>
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex shrink-0 gap-2">
                     <Link href={`/admin/restaurants/${r.id}/edit`} className="btn-secondary min-h-9 py-1" aria-label={`${r.name} 수정`}>
