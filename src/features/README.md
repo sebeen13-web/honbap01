@@ -23,3 +23,14 @@
 - `admin/restaurant-form.tsx`, `admin/toggle-active-button.tsx` — 등록·수정 폼, 숨김 버튼
 - `restaurants/schema.ts` — 식당 + 1인분 정책 zod 스키마 (클라이언트·서버 공용, 5단계 사장님 폼도 재사용)
 - `map/load-kakao-sdk.ts`, `map/address-search.tsx`, `map/kakao-types.ts` — 카카오 SDK 로더, 주소/상호 검색
+
+## 3단계에서 만든 파일 (손님 메인 화면 `/`)
+
+- `location/use-user-location.ts` — `useUserLocation()` : idle / loading / success / denied / error. `request()` 를 불러야 권한을 묻는다. 좌표는 메모리에만.
+- `map/kakao-map.tsx` — 카카오맵(한 번만 로드), 식당 마커(버튼 오버레이), 내 위치/검색 위치 마커, 반경 원, 시트에 가려지는 영역을 뺀 맞춤·이동
+- `map/kakao-types.ts` — SDK 타입(지도·오버레이·원 추가)
+- `restaurants/nearby-screen.tsx` — 화면 조립(위치 → 조회 → 필터 → 지도/목록 동기화)
+- `restaurants/use-nearby-restaurants.ts` — `nearby_restaurants` RPC 조회(마지막 요청만 반영, 다시 시도)
+- `restaurants/bottom-sheet.tsx` — 접힘/중간/펼침 3단계 시트 (끌기·탭·키보드)
+- `restaurants/filter-bar.tsx`, `restaurants/filters.ts` — 필터 칩과 클라이언트 필터 로직
+- `restaurants/restaurant-card.tsx`, `restaurants/format.ts` — 목록 카드, 거리 표기(350m / 1.2km)

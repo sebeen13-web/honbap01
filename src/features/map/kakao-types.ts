@@ -22,9 +22,74 @@ export type KakaoPlaceResult = {
   y: string;
 };
 
+export interface KakaoLatLng {
+  getLat(): number;
+  getLng(): number;
+}
+
+export interface KakaoPoint {
+  x: number;
+  y: number;
+}
+
+export interface KakaoLatLngBounds {
+  extend(latlng: KakaoLatLng): void;
+}
+
+export interface KakaoProjection {
+  pointFromCoords(latlng: KakaoLatLng): KakaoPoint;
+  coordsFromPoint(point: KakaoPoint): KakaoLatLng;
+}
+
+export interface KakaoMap {
+  setCenter(latlng: KakaoLatLng): void;
+  getCenter(): KakaoLatLng;
+  panTo(latlng: KakaoLatLng): void;
+  setLevel(level: number): void;
+  getLevel(): number;
+  /** 여백(px) 순서: 위, 오른쪽, 아래, 왼쪽 */
+  setBounds(bounds: KakaoLatLngBounds, top?: number, right?: number, bottom?: number, left?: number): void;
+  relayout(): void;
+  getProjection(): KakaoProjection;
+}
+
+export interface KakaoCustomOverlay {
+  setMap(map: KakaoMap | null): void;
+  setZIndex(z: number): void;
+  setPosition(latlng: KakaoLatLng): void;
+}
+
+export interface KakaoCircle {
+  setMap(map: KakaoMap | null): void;
+  setPosition(latlng: KakaoLatLng): void;
+  setRadius(radius: number): void;
+}
+
 export type KakaoNamespace = {
   maps: {
     load: (callback: () => void) => void;
+    LatLng: new (lat: number, lng: number) => KakaoLatLng;
+    Point: new (x: number, y: number) => KakaoPoint;
+    LatLngBounds: new (sw?: KakaoLatLng, ne?: KakaoLatLng) => KakaoLatLngBounds;
+    Map: new (container: HTMLElement, options: { center: KakaoLatLng; level: number }) => KakaoMap;
+    CustomOverlay: new (options: {
+      position: KakaoLatLng;
+      content: HTMLElement | string;
+      xAnchor?: number;
+      yAnchor?: number;
+      zIndex?: number;
+      clickable?: boolean;
+    }) => KakaoCustomOverlay;
+    Circle: new (options: {
+      center: KakaoLatLng;
+      radius: number;
+      strokeWeight?: number;
+      strokeColor?: string;
+      strokeOpacity?: number;
+      strokeStyle?: string;
+      fillColor?: string;
+      fillOpacity?: number;
+    }) => KakaoCircle;
     services: {
       Status: Record<KakaoStatus, KakaoStatus>;
       Geocoder: new () => {

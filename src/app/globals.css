@@ -47,3 +47,11 @@ body {
     @apply inline-flex min-h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60;
   }
 }
+
+/* 가로 스크롤 칩 줄: 스크롤바 숨김 (스크롤은 그대로 가능) */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

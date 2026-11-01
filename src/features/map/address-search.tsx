@@ -26,11 +26,16 @@ export function AddressSearch({
   onSelect,
   invalid,
   describedBy,
+  label = "주소 또는 상호명 검색",
+  placeholder = "도로명·지번 주소 또는 상호명",
 }: {
   appKey: string | null;
   onSelect: (s: AddressSelection) => void;
   invalid?: boolean;
   describedBy?: string;
+  /** 스크린리더용 입력칸 이름 */
+  label?: string;
+  placeholder?: string;
 }) {
   const inputId = useId();
   const [query, setQuery] = useState("");
@@ -66,7 +71,7 @@ export function AddressSearch({
       if (found.length === 0) found = await searchPlace(kakao, q);
       setCandidates(found);
       setStatus("done");
-      if (found.length === 0) setMessage("검색 결과가 없어요. 도로명 주소(예: 중앙대로 900)나 상호명으로 다시 검색해 보세요.");
+      if (found.length === 0) setMessage("검색 결과가 없어요. 동 이름(예: 고잔동), 도로명 주소, 상호명으로 다시 검색해 보세요.");
     } catch (e) {
       setStatus("error");
       setMessage(
@@ -78,7 +83,7 @@ export function AddressSearch({
   return (
     <div>
       <label htmlFor={inputId} className="sr-only">
-        주소 또는 상호명 검색
+        {label}
       </label>
       <div className="flex gap-2">
         <input
@@ -92,7 +97,7 @@ export function AddressSearch({
               void search();
             }
           }}
-          placeholder="도로명·지번 주소 또는 상호명"
+          placeholder={placeholder}
           aria-invalid={invalid || undefined}
           aria-describedby={describedBy}
           className="input"

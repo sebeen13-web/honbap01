@@ -16,6 +16,7 @@ supabase/
   seed.sql                             # 로컬용 가상 샘플 식당 4곳 (안산 중앙역 주변)
 src/
   app/                                 # 라우트 (/, /restaurants/[id], /owner, /admin ...)
+  app/page.tsx                         # 손님 메인: 지도 + 목록 시트 + 필터 (3단계)
   app/admin/login                      # 관리자 로그인 (보호 대상 아님)
   app/admin/(protected)/               # 관리자 전용: layout 에서 requireAdmin()
     restaurants/ , restaurants/new , restaurants/[id]/edit
@@ -84,3 +85,10 @@ select u.email, p.role from public.profiles p join auth.users u on u.id = p.id;
 - 서버 컴포넌트(`app/admin/(protected)/layout.tsx`, 각 page)와 **모든 서버 액션**에서 `requireAdmin()` 으로 다시 확인한다.
 - DB 에서도 RLS(`관리자 전체` 정책)와 `admin_save_restaurant()` 안의 `is_admin()` 검사로 한 번 더 막는다.
 - 저장 시 `source` / `last_verified_at` 은 클라이언트에서 받지 않는다. 트리거가 `admin_checked` / `now()` 로 기록한다.
+
+## 손님 메인 화면 (3단계)
+
+- 처음에는 안내와 "내 위치로 찾기" 버튼만 보이고, 버튼을 눌러야 위치 권한을 묻는다.
+- 위치를 거부하거나 실패하면 동네 검색(카카오 주소/키워드)으로 기준점을 고른다.
+- 손님 좌표는 `nearby_restaurants` 요청 본문(POST)에만 쓰고, 서버·localStorage·쿠키·콘솔 어디에도 남기지 않는다.
+- 위치 기능은 https 주소나 `localhost` 에서만 동작한다. 휴대폰으로 PC 개발 서버(`http://192.168...`)에 접속하면 위치가 막히므로, 휴대폰 확인은 배포 주소(https)나 동네 검색으로 한다.
