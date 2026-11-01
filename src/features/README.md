@@ -43,3 +43,12 @@
 - `restaurants/schema.ts` — `menuItemSchema`, `timeRuleSchema` 추가 (클라이언트·서버 공용)
 
 이후 화면 명세는 `docs/ROADMAP.md` 를 따른다.
+
+## 손님 로그인 + 3단계 개편 때 만든 파일
+
+- `auth/` — `use-auth.ts`(브라우저 로그인 상태), `guard.ts`(`requireUser`/`requireOwner`), `actions.ts`(로그아웃·탈퇴),
+  `kakao.ts`·`kakao-button.tsx`, `email-login-form.tsx`, `login-prompt-sheet.tsx`(로그인 유도 시트, 4단계에서 재사용), `auth-button.tsx`, `delete-account.tsx`
+- `favorites/` — `use-favorites.ts`, `remove-favorite-button.tsx`
+- `legal/legal-page.tsx` — 약관·개인정보 처리방침 틀
+- `restaurants/nearby-parse.ts` — nearby_restaurants 의 jsonb(menus, time_rules) 파싱
+- `lib/safe-redirect.ts` — 로그인 후 돌아갈 경로를 같은 사이트 내부로 제한

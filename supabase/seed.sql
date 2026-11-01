@@ -4,6 +4,7 @@
 --   1 혼고기 중앙점  : 관리자 확인, 메뉴 3개, 평일 저녁 피크(18~20시) 1인분 불가 규칙, 확인 ok 다수
 --   2 한그릇 샤브    : 사장님 등록, 점심만 가능, 최근 7일 통계
 --   3 1인 회센터     : 관리자 확인, 평일 14~17시만, 최근 14일 '안 됐어요' 3건 → needs_review
+--   샘플 손님 5명(로그인 불가) : 확인 기록·즐겨찾기 예시
 --   4 일시중단 식당  : is_active = false (손님 화면에 안 보임)
 
 insert into public.restaurants (id, name, address, latitude, longitude, phone, category, business_hours) values
@@ -40,16 +41,40 @@ insert into public.solo_time_rules (restaurant_id, day_type, start_time, end_tim
   ('00000000-0000-0000-0000-000000000003', 'weekday', '14:00', '17:00', true,  null, 0),
   ('00000000-0000-0000-0000-000000000004', 'all',     '11:00', '21:00', true,  null, 0);
 
--- 원탭 확인 (visitor_hash 는 가짜 해시)
-insert into public.solo_confirmations (restaurant_id, result, created_at, visitor_hash)
-select '00000000-0000-0000-0000-000000000001', 'ok', now() - make_interval(days => n * 4), encode(sha256(('seed-1-' || n)::bytea), 'hex')
+-- 샘플 손님 계정 5명 (비밀번호 없음 → 로그인 불가. 확인 기록·즐겨찾기 예시용)
+--   가입 트리거가 profiles(role = user, nickname)를 자동으로 만든다.
+insert into auth.users (
+  id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, recovery_token, email_change_token_new, email_change
+)
+select
+  ('00000000-0000-0000-0000-0000000000a' || n)::uuid,
+  '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+  'sample-guest-' || n || '@example.invalid', '', now(),
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  jsonb_build_object('nickname', '샘플 손님' || n),
+  now() - interval '60 days', now() - interval '60 days',
+  '', '', '', ''
 from generate_series(1, 5) as n;
-insert into public.solo_confirmations (restaurant_id, result, created_at, visitor_hash) values
-  ('00000000-0000-0000-0000-000000000001', 'not_ok', now() - interval '9 days',  encode(sha256('seed-1-x'::bytea), 'hex')),
-  ('00000000-0000-0000-0000-000000000003', 'ok',     now() - interval '20 days', encode(sha256('seed-3-a'::bytea), 'hex')),
-  ('00000000-0000-0000-0000-000000000003', 'not_ok', now() - interval '2 days',  encode(sha256('seed-3-b'::bytea), 'hex')),
-  ('00000000-0000-0000-0000-000000000003', 'not_ok', now() - interval '5 days',  encode(sha256('seed-3-c'::bytea), 'hex')),
-  ('00000000-0000-0000-0000-000000000003', 'not_ok', now() - interval '11 days', encode(sha256('seed-3-d'::bytea), 'hex'));
+
+-- 원탭 확인 (로그인 사용자 기준, 같은 사용자·같은 식당은 하루 1회)
+--   샘플 1: 최근 30일 됐어요 5 / 안 됐어요 1
+--   샘플 3: 됐어요 1 / 최근 14일 안 됐어요 3 → needs_review
+insert into public.solo_confirmations (restaurant_id, user_id, result, created_at)
+select '00000000-0000-0000-0000-000000000001', ('00000000-0000-0000-0000-0000000000a' || n)::uuid, 'ok', now() - make_interval(days => n * 4)
+from generate_series(1, 5) as n;
+insert into public.solo_confirmations (restaurant_id, user_id, result, created_at) values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1', 'not_ok', now() - interval '9 days'),
+  ('00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-0000000000a1', 'ok',     now() - interval '20 days'),
+  ('00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-0000000000a2', 'not_ok', now() - interval '2 days'),
+  ('00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-0000000000a3', 'not_ok', now() - interval '5 days'),
+  ('00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-0000000000a4', 'not_ok', now() - interval '11 days');
+
+-- 즐겨찾기 예시
+insert into public.favorites (user_id, restaurant_id) values
+  ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-000000000001'),
+  ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-000000000002');
 
 -- 사장님 통계 (최근 7일)
 insert into public.restaurant_daily_stats (restaurant_id, day, views, directions_clicks, phone_taps)

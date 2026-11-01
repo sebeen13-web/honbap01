@@ -9,7 +9,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#c2410c",
+  // 상단 바가 흰색이라 브라우저 주소창 색도 흰색으로 맞춘다 (브랜드 색은 globals.css 한 곳에서만 정의)
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

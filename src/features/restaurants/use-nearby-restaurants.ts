@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { NearbyRestaurant } from "@/types/database";
 import type { LatLng } from "@/features/location/use-user-location";
+import { normalizeNearbyRows } from "@/features/restaurants/nearby-parse";
 
 export type NearbyState =
   | { status: "idle"; rows: NearbyRestaurant[] }
@@ -41,7 +42,7 @@ export function useNearbyRestaurants(origin: LatLng | null, radiusM: number) {
           setState({ status: "error", rows: [], message: "식당 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." });
           return;
         }
-        setState({ status: "success", rows: data ?? [] });
+        setState({ status: "success", rows: normalizeNearbyRows(data) });
       } catch {
         if (cancelled) return;
         setState({

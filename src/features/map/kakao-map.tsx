@@ -4,21 +4,43 @@ import { useEffect, useRef, useState } from "react";
 import { loadKakaoSdk } from "@/features/map/load-kakao-sdk";
 import type { KakaoCircle, KakaoCustomOverlay, KakaoMap as KakaoMapInstance, KakaoNamespace } from "@/features/map/kakao-types";
 import type { LatLng } from "@/features/location/use-user-location";
-import { formatDistance } from "@/features/restaurants/format";
+import { formatDistance, formatShortPrice, formatWon } from "@/features/restaurants/format";
 import type { NearbyRestaurant } from "@/types/database";
 
 export type MapOrigin = { kind: "me" | "search"; coords: LatLng };
 export type MapInsets = { top: number; bottom: number };
 
-const PRIMARY = "#c2410c";
+/** 반경 원 색: globals.css 의 --color-primary 를 그대로 읽는다 (색 정의는 한 곳에서만) */
+function primaryColor(): string {
+  const v = getComputedStyle(document.documentElement).getPropertyValue("--color-primary").trim();
+  return v || "currentColor";
+}
 
 // 마커 스타일. 오버레이는 SDK 가 DOM 으로 그리므로 Tailwind 클래스를 문자열로 둔다.
-const MARKER_BUTTON =
-  "group flex min-h-11 flex-col items-center px-1.5 pt-1.5 focus-visible:outline-none";
-const MARKER_PILL =
-  "block max-w-36 truncate rounded-full border-2 border-primary bg-white px-2.5 py-1 text-xs font-bold text-primary-strong shadow-md transition-transform group-focus-visible:ring-4 group-focus-visible:ring-primary/40 group-data-[selected=true]:scale-110 group-data-[selected=true]:bg-primary group-data-[selected=true]:text-white";
-const MARKER_TAIL =
-  "-mt-0.5 block size-2.5 rotate-45 border-r-2 border-b-2 border-primary bg-white group-data-[selected=true]:bg-primary";
+const MARKER_BUTTON = "flex min-h-11 flex-col items-center px-1.5 pt-1.5 focus-visible:outline-none";
+const PILL_BASE =
+  "block max-w-36 truncate rounded-full border-2 px-2.5 py-1 text-xs font-bold shadow-md transition-transform";
+const TAIL_BASE = "-mt-0.5 block size-2.5 rotate-45 border-r-2 border-b-2";
+
+/** 선택됨 = 청록 채움, 지금 불가 = 회색, 그 밖 = 흰 바탕 청록 테두리 */
+function markerClasses(selected: boolean, unavailable: boolean) {
+  if (selected) {
+    return {
+      pill: `${PILL_BASE} scale-110 border-primary-strong bg-primary text-white`,
+      tail: `${TAIL_BASE} border-primary-strong bg-primary`,
+    };
+  }
+  if (unavailable) {
+    return {
+      pill: `${PILL_BASE} border-gray-400 bg-gray-100 text-gray-800`,
+      tail: `${TAIL_BASE} border-gray-400 bg-gray-100`,
+    };
+  }
+  return {
+    pill: `${PILL_BASE} border-primary bg-white text-primary-strong`,
+    tail: `${TAIL_BASE} border-primary bg-white`,
+  };
+}
 
 /**
  * 카카오맵. SDK 는 loadKakaoSdk() 로 한 번만 불러오고, 지도 인스턴스도 한 번만 만든다.
@@ -53,7 +75,9 @@ export function KakaoMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<KakaoMapInstance | null>(null);
   const kakaoRef = useRef<KakaoNamespace | null>(null);
-  const markersRef = useRef(new Map<string, { overlay: KakaoCustomOverlay; el: HTMLElement }>());
+  const markersRef = useRef(
+    new Map<string, { overlay: KakaoCustomOverlay; el: HTMLElement; pill: HTMLElement; tail: HTMLElement; unavailable: boolean }>(),
+  );
   const originOverlayRef = useRef<KakaoCustomOverlay | null>(null);
   const circleRef = useRef<KakaoCircle | null>(null);
   const insetsRef = useRef(insets);
@@ -120,10 +144,10 @@ export function KakaoMap({
       center: pos,
       radius: radiusM,
       strokeWeight: 2,
-      strokeColor: PRIMARY,
+      strokeColor: primaryColor(),
       strokeOpacity: 0.6,
       strokeStyle: "shortdash",
-      fillColor: PRIMARY,
+      fillColor: primaryColor(),
       fillOpacity: 0.05,
     });
     circleRef.current.setMap(map);
@@ -156,16 +180,23 @@ export function KakaoMap({
     const markers = markersRef.current;
 
     for (const r of restaurants) {
+      const unavailable = r.is_solo_available_now === false;
+      const cls = markerClasses(false, unavailable);
       const button = document.createElement("button");
       button.type = "button";
       button.className = MARKER_BUTTON;
       button.dataset.restaurantId = r.id;
-      button.setAttribute("aria-label", `${r.name}, ${formatDistance(r.distance_m)}`);
+      // 라벨: 최저 1인분 가격 (예: 1.8만). 가격 정보가 없으면 식당 이름
+      const price = r.min_solo_price;
+      button.setAttribute(
+        "aria-label",
+        `${r.name}, ${price !== null ? `1인분 ${formatWon(price)}부터` : "가격 정보 없음"}, ${formatDistance(r.distance_m)}${unavailable ? ", 지금은 1인분 불가" : ""}`,
+      );
       const pill = document.createElement("span");
-      pill.className = MARKER_PILL;
-      pill.textContent = r.name;
+      pill.className = cls.pill;
+      pill.textContent = price !== null ? formatShortPrice(price) : r.name;
       const tail = document.createElement("span");
-      tail.className = MARKER_TAIL;
+      tail.className = cls.tail;
       tail.setAttribute("aria-hidden", "true");
       button.append(pill, tail);
       button.addEventListener("click", () => onSelectRef.current(r.id));
@@ -178,7 +209,7 @@ export function KakaoMap({
         clickable: true,
       });
       overlay.setMap(map);
-      markers.set(r.id, { overlay, el: button });
+      markers.set(r.id, { overlay, el: button, pill, tail, unavailable });
     }
 
     return () => {
@@ -189,11 +220,14 @@ export function KakaoMap({
 
   // 4) 선택된 마커 강조
   useEffect(() => {
-    markersRef.current.forEach(({ overlay, el }, id) => {
+    markersRef.current.forEach(({ overlay, el, pill, tail, unavailable }, id) => {
       const selected = id === selectedId;
+      const cls = markerClasses(selected, unavailable);
+      pill.className = cls.pill;
+      tail.className = cls.tail;
       el.dataset.selected = String(selected);
       el.setAttribute("aria-pressed", String(selected));
-      overlay.setZIndex(selected ? 10 : 2);
+      overlay.setZIndex(selected ? 10 : unavailable ? 1 : 2);
     });
   }, [selectedId, restaurants, status]);
 

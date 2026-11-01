@@ -9,7 +9,8 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Category = "고깃집" | "샤브샤브" | "회" | "기타";
 export type TimeSlot = "all_day" | "lunch" | "dinner" | "custom";
 export type PolicySource = "admin_checked" | "owner_registered";
-export type Role = "owner" | "admin";
+/** user = 손님(가입 기본값), owner = 사장님(서버가 승격), admin = 관리자(DB 에서 직접 지정) */
+export type Role = "user" | "owner" | "admin";
 /** weekday = 월~금, weekend = 토·일, all = 매일 */
 export type DayType = "weekday" | "weekend" | "all";
 export type ConfirmationResult = "ok" | "not_ok";
@@ -28,10 +29,18 @@ export type Database = {
   public: {
     Tables: {
       profiles: {
-        Row: { id: string; role: Role; created_at: string };
-        Insert: { id: string; role?: Role; created_at?: string };
-        Update: { id?: string; role?: Role; created_at?: string };
+        Row: { id: string; role: Role; nickname: string | null; created_at: string };
+        /** 가입 트리거가 만든다. 사용자는 수정할 수 없다(역할 변경 방지) */
+        Insert: { id: string; role?: Role; nickname?: string | null; created_at?: string };
+        Update: { role?: Role; nickname?: string | null };
         Relationships: [];
+      };
+      /** 즐겨찾기: 본인 것만 읽기/추가/삭제 */
+      favorites: {
+        Row: { user_id: string; restaurant_id: string; created_at: string };
+        Insert: { user_id: string; restaurant_id: string; created_at?: string };
+        Update: never;
+        Relationships: [Rel<"favorites_restaurant_id_fkey", "restaurant_id", "restaurants", false>];
       };
       restaurants: {
         Row: {
@@ -156,10 +165,21 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["solo_time_rules"]["Insert"]>;
         Relationships: [Rel<"solo_time_rules_restaurant_id_fkey", "restaurant_id", "restaurants", false>];
       };
-      /** 등록은 서버 API(service_role)만. 읽기는 관리자만 (집계는 confirmation_summaries) */
+      /**
+       * 원탭 확인. 로그인 사용자가 본인 명의로 등록(같은 식당 하루 1회, 한국 날짜).
+       * user_id·created_at·confirm_day 는 서버 트리거가 정한다. 행 읽기는 관리자만 (집계는 confirmation_summaries)
+       * 등록할 때는 select 권한이 없으므로 결과를 돌려받지 않게(.insert(...) 만, .select() 없이) 호출한다.
+       */
       solo_confirmations: {
-        Row: { id: string; restaurant_id: string; result: ConfirmationResult; created_at: string; visitor_hash: string };
-        Insert: { id?: string; restaurant_id: string; result: ConfirmationResult; created_at?: string; visitor_hash: string };
+        Row: {
+          id: string;
+          restaurant_id: string;
+          user_id: string;
+          result: ConfirmationResult;
+          created_at: string;
+          confirm_day: string;
+        };
+        Insert: { id?: string; restaurant_id: string; user_id: string; result: ConfirmationResult };
         Update: Partial<Database["public"]["Tables"]["solo_confirmations"]["Insert"]>;
         Relationships: [Rel<"solo_confirmations_restaurant_id_fkey", "restaurant_id", "restaurants", false>];
       };
@@ -184,10 +204,11 @@ export type Database = {
         Update: never;
         Relationships: [Rel<"restaurant_daily_stats_restaurant_id_fkey", "restaurant_id", "restaurants", false>];
       };
+      /** 자유 텍스트 제보: 로그인 사용자만 등록(본인 명의), 읽기는 관리자만 */
       reports: {
-        Row: { id: string; restaurant_id: string; reason: string; created_at: string; handled: boolean };
-        Insert: { id?: string; restaurant_id: string; reason: string; created_at?: string; handled?: boolean };
-        Update: { id?: string; restaurant_id?: string; reason?: string; created_at?: string; handled?: boolean };
+        Row: { id: string; restaurant_id: string; reason: string; created_at: string; handled: boolean; user_id: string | null };
+        Insert: { id?: string; restaurant_id: string; reason: string; user_id: string; created_at?: string; handled?: boolean };
+        Update: { handled?: boolean };
         Relationships: [Rel<"reports_restaurant_id_fkey", "restaurant_id", "restaurants", false>];
       };
     };
@@ -234,6 +255,8 @@ export type Database = {
         Args: { p_restaurant_id: string; p_kind: StatKind };
         Returns: undefined;
       };
+      /** 회원 탈퇴: 확인 기록·즐겨찾기·프로필 삭제, 사장님이면 식당 연결 해제. 관리자는 불가 */
+      delete_my_account: { Args: Record<PropertyKey, never>; Returns: undefined };
       solo_available_at: { Args: { rules: Json; at_time?: string }; Returns: boolean | null };
       solo_next_available_at: { Args: { rules: Json; at_time?: string }; Returns: string | null };
     };

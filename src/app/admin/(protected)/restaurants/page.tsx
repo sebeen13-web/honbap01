@@ -56,7 +56,7 @@ export default async function AdminRestaurantsPage({
 
       <div aria-live="polite">
         {saved && NOTICE[saved] ? (
-          <p className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-900">{NOTICE[saved]}</p>
+          <p className="mt-4 rounded-lg border border-primary/30 bg-primary-soft p-3 text-sm text-primary-strong">{NOTICE[saved]}</p>
         ) : null}
         {errorKey && ERROR[errorKey] ? (
           <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
@@ -103,7 +103,7 @@ export default async function AdminRestaurantsPage({
                       <span
                         className={
                           active
-                            ? "rounded bg-green-50 px-1.5 py-0.5 text-green-800"
+                            ? "rounded bg-primary-soft px-1.5 py-0.5 text-primary-strong"
                             : "rounded bg-gray-200 px-1.5 py-0.5 text-gray-700"
                         }
                       >

@@ -16,6 +16,7 @@ supabase/
   migrations/20261102000000_menus_time_rules_confirmations.sql  # 1인분 메뉴·가격, 시간대 규칙, 원탭 확인, 연결 요청, 통계
   seed.sql                             # 샘플 식당 4곳 (메뉴·가격·시간대 규칙·확인·통계 포함)
   tests/rls_checks.sql                 # 역할별 권한 + 시간대 규칙 점검 (rollback 되어 데이터 안 남음)
+  migrations/20261103000000_customer_accounts.sql  # 손님 로그인: 역할 user/owner/admin, 닉네임, 즐겨찾기, 확인=user_id 기준, 탈퇴
 docs/ROADMAP.md                        # 차별점과 3~6단계 화면 명세 (이후 단계는 이 문서를 따른다)
 src/
   app/                                 # 라우트 (/, /restaurants/[id], /owner, /admin ...)
@@ -34,15 +35,16 @@ src/
 
 | 테이블 | 핵심 |
 |---|---|
-| `profiles` | 가입 시 자동 생성, `role` = owner(기본) / admin. 역할 변경은 관리자만 |
+| `profiles` | 가입 시 자동 생성, `role` = user(기본) / owner / admin, `nickname`(카카오 닉네임, 없으면 "익명의 혼밥러"). 사용자는 자기 역할을 바꿀 수 없음. owner 승격은 식당 연결 시 트리거만 |
+| `favorites` | 즐겨찾기 (본인 것만 읽기/쓰기, 공개 식당만 추가) |
 | `restaurants` | `location`(geography) 은 위도·경도로 자동 계산되는 생성 컬럼 + GIST 인덱스. `business_hours`(jsonb) 로 '영업 중' 판단. `owner_id` unique → 사장님당 1개 |
 | `solo_policies` | 식당당 1개. `is_active=false` = 사장님 일시중단 **또는** 관리자 숨김. `source`/`last_verified_at` 은 트리거가 로그인 역할로 결정 (클라이언트 값 무시). 메뉴·시간대 규칙을 저장해도 갱신, `is_active` 만 바꾸면 유지 |
 | `solo_menu_items` | 1인분 메뉴·가격 (식당당 최대 10개). `solo_price` 1인분 가격, `regular_price_per_person` 보통 1인당 가격, `normal_min_servings` 원래 최소 인분 |
 | `solo_time_rules` | 평일/주말/매일 × 시작~종료 × 가능/불가 (최대 8개). 겹치면 불가 우선, 자정 넘김 지원, 한국 시간. 규칙 없으면 null |
-| `solo_confirmations` | "오늘도 됐어요/안 됐어요". `visitor_hash` 만 저장(원본 IP·위치 없음), 하루 1회. 등록은 서버 API(service_role)만 |
+| `solo_confirmations` | "오늘도 됐어요/안 됐어요". 로그인 사용자만, `user_id` 기준 같은 식당 하루 1회(한국 날짜). 행 읽기는 관리자만, 공개 집계는 `confirmation_summaries()` |
 | `restaurant_claims` | 사장님 "내 식당으로 연결 요청" → 관리자 승인 시 `restaurants.owner_id` 설정 |
 | `restaurant_daily_stats` | 식당별 일자별 조회·길찾기·전화 수. `increment_restaurant_stat()` 로만 증가, 사장님은 자기 식당만 읽기 |
-| `reports` | 손님 정보 없이 식당 id + 사유만. 누구나 등록, 읽기는 관리자만 |
+| `reports` | 자유 텍스트 제보. 로그인 사용자만 등록(`user_id`), 읽기는 관리자만. 탈퇴하면 작성자 연결만 끊김 |
 
 `business_hours` 형식: `{"mon":{"open":"11:00","close":"22:00"}, "sun":null, ...}` — `null` 은 휴무, `close <= open` 은 자정 넘김, `open = close` 는 24시간.
 
@@ -125,3 +127,39 @@ psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f supabase/tests/r
 ```
 
 `PASS` / `FAIL` 이 한 줄씩 찍힌다. 한 트랜잭션 안에서 실행하고 rollback 하므로 데이터가 남지 않는다.
+
+## 손님 로그인 설정 (카카오 + 이메일)
+
+### ⚠️ 비밀 값 관리
+- **카카오 Client Secret, Supabase service_role 키는 코드·채팅·GitHub 에 절대 넣지 않는다.**
+  - 카카오 Client Secret 은 Supabase 대시보드에만 입력한다.
+  - service_role 키는 지금 앱에서 쓰지 않는다. 필요해지면 `.env.local` 에만 둔다.
+- `.env.local` 은 git 에 올리지 않는 파일이다(`.gitignore`). 공개 저장소에 올라가 있다면 `git rm --cached .env.local` 로 빼고,
+  비밀 값이 들어 있었다면 그 키를 새로 발급(재발급)한다.
+
+### 카카오 개발자 콘솔 (developers.kakao.com)
+1. 내 애플리케이션 → 앱 선택 → **앱 키 > REST API 키**를 확인한다 (Supabase 의 Client ID).
+2. **카카오 로그인 > 일반**에서 사용 설정 **ON**.
+3. **Redirect URI** 에 `https://vquelkukpoevtceblrbm.supabase.co/auth/v1/callback` 추가 (로컬 Supabase 로 시험하면 `http://localhost:54321/auth/v1/callback` 도).
+   앱 주소(`http://localhost:3000/...`)가 아니라 **Supabase 주소**다.
+4. **카카오 로그인 > 보안**에서 Client Secret 코드를 만들고 활성화한다 (Supabase 의 Client Secret).
+5. **동의항목**: `닉네임(profile_nickname)` 을 필수 또는 선택 동의로 설정한다. `프로필 사진`은 선택.
+   `카카오계정(이메일, account_email)` 은 **비즈 앱**에서만 켤 수 있다. 이메일 없이 쓰려면 아래 Supabase 의 "Allow users without an email" 을 켠다.
+6. **플랫폼 > Web 사이트 도메인**에 `http://localhost:3000` 과 배포 도메인 (지도용, 기존과 동일).
+
+### Supabase 대시보드
+1. **Authentication > Sign In / Providers > Kakao**: Enabled ON, Client ID = REST API 키, Client Secret = 위 4번 코드.
+   이메일 동의항목을 켜지 않았다면 **Allow users without an email** 을 ON.
+2. **Authentication > URL Configuration**
+   - Site URL: `http://localhost:3000` (배포 후에는 배포 주소)
+   - Redirect URLs: `http://localhost:3000/**` 와 `https://<배포 도메인>/**`
+3. **Authentication > Sign In / Providers > Email**: 사용. "Confirm email" 을 켜 두면 가입 시 인증 메일을 눌러야 로그인된다.
+   기본 메일 발송은 시간당 횟수 제한이 작으므로, 실제 운영 전에는 SMTP(예: Resend)를 설정한다.
+
+### 이메일 없이 카카오 로그인이 되는지
+- Supabase 는 기본으로 카카오에 `account_email` 동의를 함께 요청할 수 있다. 이메일 동의항목이 꺼져 있는데 요청되면 카카오가 **KOE205(설정하지 않은 동의항목)** 오류를 보여 준다.
+- 이메일을 못 받은 채로 Supabase 가 거절하면 앱 `/login` 에 "카카오 계정에서 이메일 정보를 받지 못해…" 안내가 뜬다(원인 문구가 함께 표시됨).
+- 해결: (1) Supabase Kakao 설정에서 **Allow users without an email** ON, 그래도 KOE205 가 나오면 (2) 카카오 앱을 비즈 앱으로 전환(개인 개발자도 가능)한 뒤 `카카오계정(이메일)` 을 **선택 동의**로 켠다.
+
+## 약관·개인정보 처리방침
+`/terms`, `/privacy` 는 **법률 검토 전 초안**이다. 운영자 이름·연락처(`[…]` 부분)를 채우고, 서비스 공개 전에 전문가 검토를 받는다.

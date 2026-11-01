@@ -157,11 +157,11 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "http://127.0.0.1:3000"
+site_url = "http://localhost:3000"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+additional_redirect_urls = ["http://localhost:3000/**", "http://127.0.0.1:3000/**"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -335,6 +335,21 @@ url = ""
 skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
 email_optional = false
+
+# 카카오 로그인 (로컬에서 테스트할 때만 enabled = true 로 바꾼다)
+#   값은 supabase/.env 에 넣는다 (git 에 올라가지 않음):
+#     SUPABASE_AUTH_EXTERNAL_KAKAO_CLIENT_ID=<카카오 REST API 키>
+#     SUPABASE_AUTH_EXTERNAL_KAKAO_SECRET=<카카오 로그인 Client Secret>
+#   카카오 콘솔 Redirect URI 에 http://localhost:54321/auth/v1/callback 을 추가해야 한다.
+[auth.external.kakao]
+enabled = false
+client_id = "env(SUPABASE_AUTH_EXTERNAL_KAKAO_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_KAKAO_SECRET)"
+redirect_uri = ""
+url = ""
+skip_nonce_check = false
+# 카카오에서 이메일(account_email)을 받지 않아도 로그인되게 한다 (대시보드의 "Allow users without an email")
+email_optional = true
 
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.
 # You can configure "web3" rate limit in the [auth.rate_limit] section and set up [auth.captcha] if self-hosting.

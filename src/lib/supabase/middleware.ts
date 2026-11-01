@@ -8,7 +8,7 @@ const ADMIN_LOGIN_PATH = "/admin/login";
 
 /**
  * 1) 로그인 세션 쿠키를 갱신한다 (/owner·/admin 에서 세션이 만료되지 않게).
- * 2) /admin/** (로그인 페이지 제외) 는 관리자만 통과시킨다.
+ * 2) /admin/** (로그인 페이지 제외) 는 관리자만, /me·/owner 는 로그인 사용자만 통과시킨다.
  *    서버 컴포넌트/서버 액션에서도 requireAdmin() 으로 한 번 더 확인한다(이중 확인).
  */
 export async function updateSession(request: NextRequest) {
@@ -33,9 +33,22 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
-  const isAdminArea = pathname === ADMIN_PREFIX || pathname.startsWith(`${ADMIN_PREFIX}/`);
+  const { pathname, search } = request.nextUrl;
+  const under = (prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
+  const isAdminArea = under(ADMIN_PREFIX);
   const isAdminLogin = pathname === ADMIN_LOGIN_PATH;
+
+  // 로그인이 필요한 손님/사장님 영역: /me, /owner
+  if ((under("/me") || under("/owner")) && !user) {
+    return redirectWithCookies(request, response, "/login", { next: `${pathname}${search}` });
+  }
+  // /owner: 사장님 등록·연결 요청 화면(/owner/register, /owner/claim)은 손님도, 나머지는 owner/admin 만 (5단계)
+  if (under("/owner") && user && !under("/owner/register") && !under("/owner/claim")) {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    if (profile?.role !== "owner" && profile?.role !== "admin") {
+      return redirectWithCookies(request, response, "/me", { notice: "owner-required" });
+    }
+  }
 
   if (isAdminArea && !isAdminLogin) {
     if (!user) {

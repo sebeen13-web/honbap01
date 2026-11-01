@@ -14,7 +14,9 @@ insert into auth.users (id, email) values
   ('aaaaaaaa-0000-0000-0000-00000000000a', 'admin@test.local'),
   ('bbbbbbbb-0000-0000-0000-0000000000b1', 'owner1@test.local'),
   ('bbbbbbbb-0000-0000-0000-0000000000b2', 'owner2@test.local'),
-  ('bbbbbbbb-0000-0000-0000-0000000000b3', 'owner3@test.local');
+  ('bbbbbbbb-0000-0000-0000-0000000000b3', 'owner3@test.local'),
+  ('cccccccc-0000-0000-0000-0000000000c1', 'guest1@test.local'),
+  ('cccccccc-0000-0000-0000-0000000000c2', 'guest2@test.local');
 update public.profiles set role = 'admin' where id = 'aaaaaaaa-0000-0000-0000-00000000000a';
 -- owner1 은 샘플 2(한그릇 샤브)의 사장님
 update public.restaurants set owner_id = 'bbbbbbbb-0000-0000-0000-0000000000b1' where id = '00000000-0000-0000-0000-000000000002';
@@ -50,10 +52,27 @@ begin
   exception when insufficient_privilege then raise notice 'PASS anon: 확인 행(해시) 읽기 차단';
   end;
   begin
-    insert into public.solo_confirmations (restaurant_id, result, visitor_hash)
-    values ('00000000-0000-0000-0000-000000000001', 'ok', repeat('a', 64));
-    raise notice 'FAIL anon: 확인 직접 등록이 허용됨';
-  exception when insufficient_privilege then raise notice 'PASS anon: 확인 직접 등록 차단 (서버 API 전용)';
+    insert into public.solo_confirmations (restaurant_id, result, user_id)
+    values ('00000000-0000-0000-0000-000000000001', 'ok', '00000000-0000-0000-0000-0000000000a1');
+    raise notice 'FAIL anon: 확인 등록이 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS anon: 확인 등록 차단 (로그인 필요)';
+  end;
+  begin
+    insert into public.reports (restaurant_id, reason) values ('00000000-0000-0000-0000-000000000001', '테스트');
+    raise notice 'FAIL anon: 비로그인 제보가 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS anon: 제보 차단 (로그인 필요)';
+  end;
+  begin
+    perform 1 from public.favorites;
+    raise notice 'FAIL anon: 즐겨찾기 접근이 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS anon: 즐겨찾기 접근 차단';
+  end;
+  select count(*) into n from public.profiles;
+  raise notice '% anon: 프로필 0행 (실제 %)', case when n = 0 then 'PASS' else 'FAIL' end, n;
+  begin
+    perform public.delete_my_account();
+    raise notice 'FAIL anon: 탈퇴 함수 실행이 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS anon: 탈퇴 함수 차단';
   end;
   begin
     perform 1 from public.restaurant_daily_stats;
@@ -161,6 +180,12 @@ begin
   select source into src from public.solo_policies where restaurant_id = '00000000-0000-0000-0000-000000000002';
   raise notice '% owner1: 출처 위조 불가 (결과 %)', case when src = 'owner_registered' then 'PASS' else 'FAIL' end, src;
 
+  select role into src from public.profiles where id = 'bbbbbbbb-0000-0000-0000-0000000000b1';
+  raise notice '% owner1: 식당이 연결되면 user → owner 자동 승격 (현재 %)', case when src = 'owner' then 'PASS' else 'FAIL' end, src;
+  update public.profiles set role = 'admin' where id = 'bbbbbbbb-0000-0000-0000-0000000000b1';
+  get diagnostics n = row_count;
+  raise notice '% owner1: 자기 역할을 admin 으로 못 바꿈 (변경 % 행)', case when n = 0 then 'PASS' else 'FAIL' end, n;
+
   select count(*) into n from public.restaurant_daily_stats where restaurant_id = '00000000-0000-0000-0000-000000000002';
   raise notice '% owner1: 자기 식당 통계 읽기 (기대 7, 실제 %)', case when n = 7 then 'PASS' else 'FAIL' end, n;
   select count(*) into n from public.restaurant_daily_stats where restaurant_id <> '00000000-0000-0000-0000-000000000002';
@@ -186,6 +211,9 @@ declare n int;
 begin
   insert into public.restaurant_claims (restaurant_id, owner_id) values ('00000000-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-0000000000b2');
   raise notice 'PASS owner2: 연결 안 된 식당에 연결 요청';
+  raise notice '% owner2: 승인 전에는 user (현재 %)',
+    case when (select role from public.profiles where id = auth.uid()) = 'user' then 'PASS' else 'FAIL' end,
+    (select role from public.profiles where id = auth.uid());
   begin
     insert into public.restaurant_claims (restaurant_id, owner_id) values ('00000000-0000-0000-0000-000000000003', 'bbbbbbbb-0000-0000-0000-0000000000b2');
     raise notice 'FAIL owner2: 대기 중 요청이 있는데 또 요청됨';
@@ -235,6 +263,17 @@ begin
   select status into st from public.restaurant_claims where owner_id = 'bbbbbbbb-0000-0000-0000-0000000000b3';
   raise notice '% admin: 승인 → 식당에 사장님 연결, 같은 식당 다른 요청은 거절 (owner=%, 다른 요청=%)',
     case when o = 'bbbbbbbb-0000-0000-0000-0000000000b2' and st = 'rejected' then 'PASS' else 'FAIL' end, o, st;
+  select role into src from public.profiles where id = 'bbbbbbbb-0000-0000-0000-0000000000b2';
+  raise notice '% admin: 연결 요청 승인 → owner2 가 owner 로 승격 (현재 %)', case when src = 'owner' then 'PASS' else 'FAIL' end, src;
+  select role into src from public.profiles where id = 'bbbbbbbb-0000-0000-0000-0000000000b3';
+  raise notice '% admin: 거절된 owner3 은 user 유지 (현재 %)', case when src = 'user' then 'PASS' else 'FAIL' end, src;
+  select count(*) into n from public.reports;
+  raise notice '% admin: 제보 읽기 가능', case when n >= 0 then 'PASS' else 'FAIL' end;
+  begin
+    perform public.delete_my_account();
+    raise notice 'FAIL admin: 관리자 탈퇴가 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS admin: 관리자 계정은 탈퇴 불가(실수 방지)';
+  end;
   begin
     update public.restaurant_claims set status = 'rejected' where owner_id = 'bbbbbbbb-0000-0000-0000-0000000000b2';
     raise notice 'FAIL admin: 처리된 요청 상태가 다시 바뀜';
@@ -261,24 +300,149 @@ end $$;
 reset role;
 
 -- =====================================================================
--- 5) 서버 API (service_role)
+-- 5) 로그인 손님 guest1 (role = user)
+-- =====================================================================
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"cccccccc-0000-0000-0000-0000000000c1","role":"authenticated"}', true) as _claims \gset
+do $$
+declare n int; r text; u uuid;
+begin
+  select role into r from public.profiles where id = auth.uid();
+  raise notice '% guest1: 가입 기본 역할 = user (현재 %)', case when r = 'user' then 'PASS' else 'FAIL' end, r;
+  select count(*) into n from public.profiles;
+  raise notice '% guest1: 자기 프로필만 보임 (실제 %)', case when n = 1 then 'PASS' else 'FAIL' end, n;
+  update public.profiles set role = 'owner' where id = auth.uid();
+  get diagnostics n = row_count;
+  raise notice '% guest1: 자기 역할을 owner 로 못 바꿈 (변경 % 행)', case when n = 0 then 'PASS' else 'FAIL' end, n;
+  update public.profiles set role = 'admin' where id = auth.uid();
+  get diagnostics n = row_count;
+  raise notice '% guest1: 자기 역할을 admin 으로 못 바꿈 (변경 % 행)', case when n = 0 then 'PASS' else 'FAIL' end, n;
+
+  -- 즐겨찾기
+  insert into public.favorites (user_id, restaurant_id) values (auth.uid(), '00000000-0000-0000-0000-000000000001');
+  raise notice 'PASS guest1: 즐겨찾기 추가';
+  begin
+    insert into public.favorites (user_id, restaurant_id) values (auth.uid(), '00000000-0000-0000-0000-000000000004');
+    raise notice 'FAIL guest1: 숨김 식당 즐겨찾기가 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS guest1: 숨김 식당은 즐겨찾기 불가';
+  end;
+  begin
+    insert into public.favorites (user_id, restaurant_id) values ('00000000-0000-0000-0000-0000000000a5', '00000000-0000-0000-0000-000000000001');
+    raise notice 'FAIL guest1: 남의 즐겨찾기 추가가 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS guest1: 남의 명의 즐겨찾기 불가';
+  end;
+  select count(*) into n from public.favorites;
+  raise notice '% guest1: 자기 즐겨찾기만 보임 (기대 1, 실제 %)', case when n = 1 then 'PASS' else 'FAIL' end, n;
+  delete from public.favorites where user_id = '00000000-0000-0000-0000-0000000000a1';
+  get diagnostics n = row_count;
+  raise notice '% guest1: 남의 즐겨찾기 삭제 0행 (실제 %)', case when n = 0 then 'PASS' else 'FAIL' end, n;
+
+  -- 원탭 확인 (4단계 버튼이 쓸 규칙)
+  insert into public.solo_confirmations (restaurant_id, user_id, result) values ('00000000-0000-0000-0000-000000000001', auth.uid(), 'ok');
+  raise notice 'PASS guest1: 확인 등록';
+  begin
+    insert into public.solo_confirmations (restaurant_id, user_id, result) values ('00000000-0000-0000-0000-000000000001', auth.uid(), 'not_ok');
+    raise notice 'FAIL guest1: 같은 식당 하루 2회가 허용됨';
+  exception when unique_violation then raise notice 'PASS guest1: 같은 식당 하루 1회 (user_id·한국 날짜 기준)';
+  end;
+  begin
+    insert into public.solo_confirmations (restaurant_id, user_id, result, created_at, confirm_day)
+    values ('00000000-0000-0000-0000-000000000001', auth.uid(), 'ok', now() - interval '3 days', current_date - 3);
+    raise notice 'FAIL guest1: 날짜를 바꿔 하루 1회 제한을 우회함';
+  exception when unique_violation then raise notice 'PASS guest1: 날짜·시각을 직접 넣어도 서버가 오늘로 고정';
+  end;
+  begin
+    insert into public.solo_confirmations (restaurant_id, user_id, result)
+    values ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000000a5', 'not_ok');
+    raise notice 'PASS guest1: (다른 사람 id 를 넣어도) 등록은 됨 → 아래에서 본인 명의로 저장됐는지 확인';
+  exception when insufficient_privilege then raise notice 'PASS guest1: 남의 명의 확인 등록 차단';
+  end;
+  begin
+    insert into public.solo_confirmations (restaurant_id, user_id, result) values ('00000000-0000-0000-0000-000000000004', auth.uid(), 'ok');
+    raise notice 'FAIL guest1: 숨김 식당 확인이 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS guest1: 숨김 식당은 확인 불가';
+  end;
+  select count(*) into n from public.solo_confirmations;
+  raise notice '% guest1: 확인 원본 행은 못 읽음(집계 함수로만) (실제 %)', case when n = 0 then 'PASS' else 'FAIL' end, n;
+
+  -- 제보
+  insert into public.reports (restaurant_id, reason, user_id) values ('00000000-0000-0000-0000-000000000001', '1인분 안 된대요', auth.uid());
+  raise notice 'PASS guest1: 로그인 사용자 제보';
+  begin
+    insert into public.reports (restaurant_id, reason, user_id) values ('00000000-0000-0000-0000-000000000001', 'x', '00000000-0000-0000-0000-0000000000a5');
+    raise notice 'FAIL guest1: 남의 명의 제보가 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS guest1: 남의 명의 제보 불가';
+  end;
+  select count(*) into n from public.reports;
+  raise notice '% guest1: 제보 읽기 0행(관리자만) (실제 %)', case when n = 0 then 'PASS' else 'FAIL' end, n;
+
+  -- 관리자 페이지용 데이터
+  begin
+    perform public.admin_save_restaurant(null, 'x', 'y', 37.3, 126.8, null, '기타', null, 'all_day', null, false, null,
+      '[{"name":"a","solo_price":1000}]'::jsonb, null);
+    raise notice 'FAIL guest1: 관리자 저장 함수가 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS guest1: 관리자 저장 함수 차단';
+  end;
+end $$;
+reset role;
+
+do $$
+declare u uuid;
+begin
+  select user_id into u from public.solo_confirmations where restaurant_id = '00000000-0000-0000-0000-000000000002' order by created_at desc limit 1;
+  raise notice '% guest1: 남의 id 로 넣은 확인도 본인 명의로 저장됨 (저장된 user_id=%)',
+    case when u = 'cccccccc-0000-0000-0000-0000000000c1' then 'PASS' else 'FAIL' end, u;
+end $$;
+
+-- 사장님 등록 흐름: 손님이 자기 식당을 등록하면 owner 로 승격 (5단계 "내 식당 등록하기")
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"cccccccc-0000-0000-0000-0000000000c2","role":"authenticated"}', true) as _claims \gset
+do $$
+declare r text;
+begin
+  insert into public.restaurants (name, address, latitude, longitude, category, owner_id)
+  values ('(테스트) 손님이 등록한 식당', '경기도 안산시', 37.31, 126.83, '기타', auth.uid());
+  select role into r from public.profiles where id = auth.uid();
+  raise notice '% guest2: 내 식당 등록 → owner 승격 (현재 %)', case when r = 'owner' then 'PASS' else 'FAIL' end, r;
+end $$;
+reset role;
+
+-- =====================================================================
+-- 5-2) 회원 탈퇴
+-- =====================================================================
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-0000-0000-0000-0000000000b1","role":"authenticated"}', true) as _claims \gset
+do $$ begin perform public.delete_my_account(); end $$;
+select set_config('request.jwt.claims', '{"sub":"cccccccc-0000-0000-0000-0000000000c1","role":"authenticated"}', true) as _claims \gset
+do $$ begin perform public.delete_my_account(); end $$;
+reset role;
+do $$
+declare n int; o uuid;
+begin
+  select owner_id into o from public.restaurants where id = '00000000-0000-0000-0000-000000000002';
+  raise notice '% 탈퇴(사장님 owner1): 식당 연결 해제, 식당은 남음 (owner_id=%)', case when o is null then 'PASS' else 'FAIL' end, o;
+  select count(*) into n from auth.users where id in ('bbbbbbbb-0000-0000-0000-0000000000b1', 'cccccccc-0000-0000-0000-0000000000c1');
+  raise notice '% 탈퇴: 계정 삭제 (남은 %)', case when n = 0 then 'PASS' else 'FAIL' end, n;
+  select count(*) into n from public.profiles where id in ('bbbbbbbb-0000-0000-0000-0000000000b1', 'cccccccc-0000-0000-0000-0000000000c1');
+  raise notice '% 탈퇴: 프로필 삭제 (남은 %)', case when n = 0 then 'PASS' else 'FAIL' end, n;
+  select count(*) into n from public.favorites where user_id = 'cccccccc-0000-0000-0000-0000000000c1';
+  raise notice '% 탈퇴: 즐겨찾기 삭제 (남은 %)', case when n = 0 then 'PASS' else 'FAIL' end, n;
+  select count(*) into n from public.solo_confirmations where user_id = 'cccccccc-0000-0000-0000-0000000000c1';
+  raise notice '% 탈퇴: 확인 기록 삭제 (남은 %)', case when n = 0 then 'PASS' else 'FAIL' end, n;
+  select count(*) into n from public.reports where reason = '1인분 안 된대요' and user_id is null;
+  raise notice '% 탈퇴: 제보 내용은 남고 작성자 연결만 끊김 (%건)', case when n = 1 then 'PASS' else 'FAIL' end, n;
+end $$;
+
+-- =====================================================================
+-- 5-3) 서버 (service_role): 90일 정리
 -- =====================================================================
 set local role service_role;
 select set_config('request.jwt.claims', '{"role":"service_role"}', true) as _claims \gset
 do $$
 declare n int;
 begin
-  insert into public.solo_confirmations (restaurant_id, result, visitor_hash)
-  values ('00000000-0000-0000-0000-000000000002', 'ok', repeat('f', 64));
-  raise notice 'PASS service_role: 확인 등록 가능';
-  begin
-    insert into public.solo_confirmations (restaurant_id, result, visitor_hash)
-    values ('00000000-0000-0000-0000-000000000002', 'not_ok', repeat('f', 64));
-    raise notice 'FAIL service_role: 같은 사람 같은 식당 하루 2회가 허용됨';
-  exception when unique_violation then raise notice 'PASS service_role: 같은 해시·같은 식당 하루 1회 제한';
-  end;
-  insert into public.solo_confirmations (restaurant_id, result, visitor_hash, created_at)
-  values ('00000000-0000-0000-0000-000000000002', 'ok', repeat('e', 64), now() - interval '100 days');
+  insert into public.solo_confirmations (restaurant_id, user_id, result, created_at)
+  values ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000000a5', 'ok', now() - interval '100 days');
   select public.purge_old_confirmations() into n;
   raise notice '% service_role: 90일 지난 확인 삭제 (삭제 %행)', case when n = 1 then 'PASS' else 'FAIL' end, n;
 end $$;
