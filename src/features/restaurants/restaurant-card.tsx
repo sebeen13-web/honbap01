@@ -9,7 +9,7 @@ import type { NearbyRestaurant } from "@/types/database";
 const MENU_PREVIEW = 2;
 
 /** 시간 배지: true → 지금 1인분 가능 / false → "17:00부터 가능" 또는 "지금은 불가" / null → 없음 */
-export function TimeBadge({ r }: { r: NearbyRestaurant }) {
+export function TimeBadge({ r }: { r: Pick<NearbyRestaurant, "is_solo_available_now" | "next_available_at"> }) {
   if (r.is_solo_available_now === true) {
     return (
       <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-white">지금 1인분 가능</span>

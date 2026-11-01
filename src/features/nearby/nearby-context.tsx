@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { DEFAULT_RADIUS_M } from "@/lib/constants";
 import { useUserLocation, type LatLng, type UserLocationState } from "@/features/location/use-user-location";
 import { useNearbyRestaurants, type NearbyState } from "@/features/restaurants/use-nearby-restaurants";
@@ -40,6 +41,8 @@ type NearbyContextValue = {
   favorites: ReturnType<typeof useFavorites>;
   /** 로그인이 필요한 행동에서 호출: 로그인했으면 true, 아니면 유도 시트를 띄우고 false */
   requireLogin: (prompt: Exclude<LoginPrompt, null>) => boolean;
+  /** 이 앱 안에서 이전 화면이 있는지 (상세의 뒤로가기: 있으면 back, 없으면 홈) */
+  canGoBack: () => boolean;
 };
 
 const NearbyContext = createContext<NearbyContextValue | null>(null);
@@ -61,6 +64,14 @@ export function NearbyProvider({ kakaoAppKey, children }: { kakaoAppKey: string 
   const [loginPrompt, setLoginPrompt] = useState<LoginPrompt>(null);
   const auth = useAuth();
   const favorites = useFavorites(auth.status === "user" ? auth.userId : null);
+
+  // 앱 안에서 화면을 몇 번 옮겼는지 (처음 들어온 화면 = 1)
+  const pathname = usePathname();
+  const navCount = useRef(0);
+  useEffect(() => {
+    navCount.current += 1;
+  }, [pathname]);
+  const canGoBack = useCallback(() => navCount.current > 1, []);
 
   const me = location.status === "success" ? location.coords : null;
 
@@ -135,10 +146,11 @@ export function NearbyProvider({ kakaoAppKey, children }: { kakaoAppKey: string 
       auth,
       favorites,
       requireLogin,
+      canGoBack,
     }),
     // origin 은 매번 새 객체이므로 구성 값으로 비교한다
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [kakaoAppKey, location, findMe, pickArea, searchOpen, origin?.kind, origin?.coords.lat, origin?.coords.lng, origin?.label, radiusM, nearby, retry, filters, sort, pendingFocusId, auth, favorites, requireLogin],
+    [kakaoAppKey, location, findMe, pickArea, searchOpen, origin?.kind, origin?.coords.lat, origin?.coords.lng, origin?.label, radiusM, nearby, retry, filters, sort, pendingFocusId, auth, favorites, requireLogin, canGoBack],
   );
 
   return (

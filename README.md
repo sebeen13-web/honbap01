@@ -21,8 +21,10 @@ supabase/
 docs/ROADMAP.md                        # 차별점과 3~6단계 화면 명세 (이후 단계는 이 문서를 따른다)
 src/
   app/                                 # 라우트 (/, /restaurants/[id], /owner, /admin ...)
-  app/(tabs)/                          # 하단 탭 화면: / (홈), /map (지도), /request (요청), /me (내 정보)
-  app/(tabs)/layout.tsx                # NearbyProvider + 하단 탭 (탭을 옮겨도 위치·조회 결과 유지)
+  app/(guest)/layout.tsx               # NearbyProvider (탭 화면 + 식당 상세가 공유: 위치·조회 결과 유지)
+  app/(guest)/(tabs)/                  # 하단 탭 화면: / (홈), /map (지도), /request (요청), /me (내 정보)
+  app/(guest)/restaurants/[id]/        # 식당 상세 (탭 없음, 뒤로가기)
+  app/api/restaurants/[id]/confirm/    # "오늘도 됐어요/안 됐어요" 등록 API (로그인, 하루 1회)
   app/admin/login                      # 관리자 로그인 (보호 대상 아님)
   app/admin/(protected)/               # 관리자 전용: layout 에서 requireAdmin()
     restaurants/ , restaurants/new , restaurants/[id]/edit

@@ -60,3 +60,11 @@
 - `home/` — `home-screen.tsx`(섹션), `menu-search.ts`·`menu-result-card.tsx`(메뉴 이름 검색)
 - `requests/` — `request-screen.tsx`(요청·+1·공유), `place-search.ts`(카카오 장소 검색, 음식 종류 추정)
 - `admin/request-actions.ts` — 요청 조사 완료·식당 연결
+
+## 4단계(식당 상세) 때 만든 파일
+
+- `detail/detail-top-bar.tsx` — 뒤로가기(앱 안 이전 화면 / 없으면 홈) + 즐겨찾기, 조회 수 +1
+- `detail/detail-actions.tsx` — 길찾기(카카오맵)·전화, 누르면 통계 +1
+- `detail/confirm-box.tsx` — "오늘도 됐어요 / 안 됐어요" (API 호출, 하루 1회 안내, 집계 바로 갱신)
+- `detail/report-sheet.tsx` — 정보가 다를 때 제보 (빠른 선택 + 자유 글, 로그인)
+- `detail/stats.ts` — `bumpStat()` (increment_restaurant_stat)
