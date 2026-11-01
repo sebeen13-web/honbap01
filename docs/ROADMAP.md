@@ -21,6 +21,7 @@
 | 하단 탭 + 홈 + 요청 | 하단 탭(홈 / 지도 / 요청 / 내 정보), 홈(메뉴 검색·섹션), 지도는 `/map`, 요청 탭(요청·+1·공유), 관리자 요청 목록 | 완료 (`20261104000000_home_and_requests.sql`) |
 | 4 | 상세 + 원탭 확인 + 통계 호출 + 제보 | 완료 (`/restaurants/[id]`, `POST /api/restaurants/[id]/confirm`, DB 변경 없음) |
 | 5 | 사장님 등록·대시보드·스티커, 관리자 승인 | 완료 (`20261106000000_owner.sql`, `/owner`, `/owner/register`, `/owner/edit`, `/owner/sticker`, `/admin/claims`, `/admin/review`) |
+| 실데이터 | 안산 1인분 가능 식당 조사 23곳 + 관리자 일괄 등록(`/admin/import`), 길찾기 출발지 = 내 위치 | 완료 (DB 변경 없음) |
 | 6 | 데이터 정리 점검, 배포 가이드 | 예정 |
 
 이후 단계는 아래 **화면 명세를 반드시 따른다.**

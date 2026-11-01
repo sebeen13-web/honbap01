@@ -21,6 +21,7 @@
 - `admin/auth-actions.ts`, `admin/login-form.tsx` — 관리자 로그인/로그아웃
 - `admin/restaurant-actions.ts` — 식당 저장(`admin_save_restaurant` RPC), 숨김/숨김 해제
 - `admin/restaurant-form.tsx`, `admin/toggle-active-button.tsx` — 등록·수정 폼, 숨김 버튼
+- `admin/import/` — 조사 식당 목록(`ansan-research.ts`, 근거 링크 포함), 일괄 등록 화면·서버 액션(`/admin/import`)
 - `restaurants/schema.ts` — 식당 + 1인분 정책 zod 스키마 (클라이언트·서버 공용, 5단계 사장님 폼도 재사용)
 - `map/load-kakao-sdk.ts`, `map/address-search.tsx`, `map/kakao-types.ts` — 카카오 SDK 로더, 주소/상호 검색
 

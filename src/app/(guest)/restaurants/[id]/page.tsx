@@ -114,7 +114,6 @@ export default async function RestaurantDetailPage({ params }: Params) {
           latitude={r.latitude}
           longitude={r.longitude}
           phone={r.phone}
-          kakaoPlaceId={r.kakao_place_id}
         />
 
         {/* 메뉴 표 */}

@@ -29,6 +29,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin/review" className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-gray-800">
               확인 필요
             </Link>
+            <Link href="/admin/import" className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-gray-800">
+              일괄 등록
+            </Link>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <span className="hidden text-gray-600 sm:inline">{user.email}</span>
