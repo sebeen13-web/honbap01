@@ -323,6 +323,25 @@ export type Database = {
       i_voted_request: { Args: { p_request_id: string }; Returns: boolean };
       /** 관리자: 요청을 기존 식당에 연결 → 요청 '등록됨' */
       admin_link_request: { Args: { p_request_id: string; p_restaurant_id: string }; Returns: undefined };
+      /** 사장님: 카카오 장소가 이미 조사된 식당인지, 요청 수, 내 연결 요청 상태 */
+      owner_place_lookup: { Args: { p_kakao_place_id: string }; Returns: OwnerPlaceLookup[] };
+      /** 사장님: 새 식당 등록(p_id = null, owner 승격) 또는 내 식당 수정. 메뉴 1~10, 시간대 규칙 1~8 필수 */
+      owner_save_restaurant: {
+        Args: {
+          p_id: string | null;
+          p_kakao_place_id: string | null;
+          p_name: string;
+          p_address: string;
+          p_latitude: number;
+          p_longitude: number;
+          p_phone: string | null;
+          p_category: Category;
+          p_menus: Json;
+          p_time_rules: Json;
+        };
+        Returns: string;
+      };
+      restaurant_place_taken: { Args: { p_kakao_place_id: string }; Returns: boolean };
       solo_available_at: { Args: { rules: Json; at_time?: string }; Returns: boolean | null };
       solo_next_available_at: { Args: { rules: Json; at_time?: string }; Returns: string | null };
     };
@@ -420,4 +439,14 @@ export type RequestListItem = {
   /** 기준점을 넘겼을 때만 */
   distance_m: number | null;
   i_voted: boolean;
+};
+
+export type OwnerPlaceLookup = {
+  restaurant_id: string | null;
+  restaurant_name: string | null;
+  has_owner: boolean | null;
+  is_mine: boolean | null;
+  request_votes: number | null;
+  request_status: RequestStatus | null;
+  my_claim_status: ClaimStatus | null;
 };

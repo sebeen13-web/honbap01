@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { unstable_rethrow } from "next/navigation";
 import { deleteAccountAction } from "@/features/auth/actions";
 
 /** 회원 탈퇴 (확인 체크 후 실행) */
@@ -48,7 +49,8 @@ export function DeleteAccount({ ownedRestaurant, isAdmin }: { ownedRestaurant: s
             try {
               const res = await deleteAccountAction();
               if (res && !res.ok) setError(res.message);
-            } catch {
+            } catch (e) {
+              unstable_rethrow(e); // 성공 시 서버의 redirect 는 그대로 진행
               setError("탈퇴를 처리하지 못했어요. 잠시 후 다시 시도해 주세요.");
             }
           })

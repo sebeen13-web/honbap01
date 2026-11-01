@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { unstable_rethrow } from "next/navigation";
 import { CATEGORIES, TIME_SLOT_LABEL } from "@/lib/constants";
 import { AddressSearch } from "@/features/map/address-search";
 import { saveRestaurantAction } from "@/features/admin/restaurant-actions";
@@ -133,7 +134,8 @@ export function RestaurantForm({
           setFormError(res.message);
           focusFirstError();
         }
-      } catch {
+      } catch (e) {
+        unstable_rethrow(e); // 성공 시 서버의 redirect 는 그대로 진행
         setFormError("서버와 통신하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.");
       }
     });

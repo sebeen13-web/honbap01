@@ -20,7 +20,7 @@
 | 손님 로그인 | 카카오·이메일 로그인, /login·/me·/me/favorites, 즐겨찾기, 회원 탈퇴, 약관·개인정보 처리방침(초안) | 완료 (`20261103000000_customer_accounts.sql`) |
 | 하단 탭 + 홈 + 요청 | 하단 탭(홈 / 지도 / 요청 / 내 정보), 홈(메뉴 검색·섹션), 지도는 `/map`, 요청 탭(요청·+1·공유), 관리자 요청 목록 | 완료 (`20261104000000_home_and_requests.sql`) |
 | 4 | 상세 + 원탭 확인 + 통계 호출 + 제보 | 완료 (`/restaurants/[id]`, `POST /api/restaurants/[id]/confirm`, DB 변경 없음) |
-| 5 | 사장님 등록·카카오 로그인·대시보드·스티커, 관리자 승인 | 예정 |
+| 5 | 사장님 등록·대시보드·스티커, 관리자 승인 | 완료 (`20261106000000_owner.sql`, `/owner`, `/owner/register`, `/owner/edit`, `/owner/sticker`, `/admin/claims`, `/admin/review`) |
 | 6 | 데이터 정리 점검, 배포 가이드 | 예정 |
 
 이후 단계는 아래 **화면 명세를 반드시 따른다.**
@@ -87,6 +87,7 @@
 | 즐겨찾기 | `favorites` (본인만), `useFavorites(userId)` |
 | 역할 | profiles.role = user(가입 기본) / owner(식당 연결 시 트리거가 승격) / admin(DB 에서 직접) |
 | 탭 공통 상태 | `NearbyProvider` / `useNearby()` (`src/features/nearby/nearby-context.tsx`): 위치·기준점·반경·조회 결과·지도 필터·즐겨찾기·로그인 유도·`canGoBack()`. `src/app/(guest)/layout.tsx` 에 있어 탭 화면과 상세가 함께 쓴다. 좌표는 메모리에만 |
+| 사장님 | `owner_place_lookup()`(이미 조사된 식당·요청 수·내 연결 요청), `owner_save_restaurant()`(새 등록 = owner 승격 / 내 식당 수정, 메뉴·시간 규칙 필수). 화면: `src/features/owner/` (3단계 마법사, 임시 저장은 이 브라우저 localStorage) |
 | 상세 | `src/app/(guest)/restaurants/[id]/page.tsx` (탭 없음, 뒤로가기), 확인 `POST /api/restaurants/[id]/confirm` (401 로그인 / 409 오늘 이미 / 403 비공개), 통계 `bumpStat()` (`src/features/detail/stats.ts`) |
 | 요청 | `restaurant_requests`(누구나 읽기, created_by 비공개), `restaurant_request_votes`(본인 것만), `create_restaurant_request()`(로그인, 하루 5개, 공개 식당 차단), `list_restaurant_requests()`, `place_request_status()`, `admin_link_request()` |
 | 식당 ↔ 요청 | `restaurants.kakao_place_id` — 같은 id 로 등록·연결되면 트리거가 요청을 '등록됨'으로 |

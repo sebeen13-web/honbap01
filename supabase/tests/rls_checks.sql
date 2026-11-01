@@ -18,7 +18,9 @@ insert into auth.users (id, email) values
   ('cccccccc-0000-0000-0000-0000000000c1', 'guest1@test.local'),
   ('cccccccc-0000-0000-0000-0000000000c2', 'guest2@test.local'),
   ('dddddddd-0000-0000-0000-0000000000d1', 'req1@test.local'),
-  ('dddddddd-0000-0000-0000-0000000000d2', 'req2@test.local');
+  ('dddddddd-0000-0000-0000-0000000000d2', 'req2@test.local'),
+  ('eeeeeeee-0000-0000-0000-0000000000e1', 'newowner@test.local'),
+  ('eeeeeeee-0000-0000-0000-0000000000e2', 'other@test.local');
 update public.profiles set role = 'admin' where id = 'aaaaaaaa-0000-0000-0000-00000000000a';
 -- owner1 은 샘플 2(한그릇 샤브)의 사장님
 update public.restaurants set owner_id = 'bbbbbbbb-0000-0000-0000-0000000000b1' where id = '00000000-0000-0000-0000-000000000002';
@@ -656,5 +658,104 @@ begin
   select vote_count into c from public.restaurant_requests where id = '00000000-0000-0000-0000-0000000000b1';
   raise notice '% 탈퇴: 그 사람의 +1 이 빠짐 (b1 = %)', case when c = 3 then 'PASS' else 'FAIL' end, c;
 end $$;
+
+
+-- =====================================================================
+-- 8) 사장님 등록 (손님 계정 → 내 식당 등록하기)
+-- =====================================================================
+set local role anon;
+select set_config('request.jwt.claims', '{"role":"anon"}', true) as _claims \gset
+do $$ begin
+  begin
+    perform * from public.owner_place_lookup('9900000001');
+    raise notice 'FAIL anon: 장소 조회가 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS anon: 사장님 장소 조회 차단';
+  end;
+  begin
+    perform public.owner_save_restaurant(null, '9900000555', 'x', 'y', 37.31, 126.83, null, '기타',
+      '[{"name":"a","solo_price":1000}]'::jsonb, '[{"day_type":"all","start_time":"11:00","end_time":"21:00","available":true}]'::jsonb);
+    raise notice 'FAIL anon: 비로그인 식당 등록이 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS anon: 식당 등록은 로그인 필요';
+  end;
+end $$;
+reset role;
+
+-- 요청이 모인 새 장소 (newowner 가 등록할 곳)
+insert into public.restaurant_requests (kakao_place_id, name, address, latitude, longitude, vote_count, created_by)
+values ('9900000555', '새 사장님 식당', '경기도 안산시', 37.31, 126.83, 0, '00000000-0000-0000-0000-0000000000a1');
+insert into public.restaurant_request_votes (user_id, request_id)
+select u, (select id from public.restaurant_requests where kakao_place_id = '9900000555')
+from unnest(array['00000000-0000-0000-0000-0000000000a1','00000000-0000-0000-0000-0000000000a2']::uuid[]) as u;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"eeeeeeee-0000-0000-0000-0000000000e1","role":"authenticated"}', true) as _claims \gset
+do $$
+declare r record; rid uuid; st text; role_ text; src text; n int;
+begin
+  select * into r from public.owner_place_lookup('9900000555');
+  raise notice '% newowner: 장소 조회 — 등록 전, 요청 2명 (restaurant=%, votes=%)',
+    case when r.restaurant_id is null and r.request_votes = 2 then 'PASS' else 'FAIL' end, r.restaurant_id, r.request_votes;
+  select * into r from public.owner_place_lookup('9900000004');
+  raise notice '% newowner: 숨김 식당도 "이미 조사된 식당"으로 찾음, 다른 사장님 정보는 없음 (has_owner=%)',
+    case when r.restaurant_id = '00000000-0000-0000-0000-000000000004' and r.has_owner = false then 'PASS' else 'FAIL' end, r.has_owner;
+
+  begin
+    perform public.owner_save_restaurant(null, '9900000555', '새 사장님 식당', '경기도 안산시', 37.31, 126.83, null, '기타',
+      '[{"name":"정식 1인","solo_price":9000}]'::jsonb, '[]'::jsonb);
+    raise notice 'FAIL newowner: 시간 규칙 없이 등록됨';
+  exception when check_violation then raise notice 'PASS newowner: 시간대 규칙 1개 이상 필수';
+  end;
+  begin
+    perform public.owner_save_restaurant(null, '9900000001', '혼고기', '안산', 37.31, 126.83, null, '고깃집',
+      '[{"name":"a","solo_price":9000}]'::jsonb, '[{"day_type":"all","start_time":"11:00","end_time":"21:00","available":true}]'::jsonb);
+    raise notice 'FAIL newowner: 이미 있는 식당을 새로 등록함';
+  exception when unique_violation then raise notice 'PASS newowner: 이미 등록된 장소는 새 등록 불가(연결 요청으로)';
+  end;
+
+  rid := public.owner_save_restaurant(null, '9900000555', '새 사장님 식당', '경기도 안산시 단원구', 37.31, 126.83, '031-555-0000', '기타',
+    '[{"name":"정식 1인","solo_price":9000,"regular_price_per_person":8000}]'::jsonb,
+    '[{"day_type":"all","start_time":"11:00","end_time":"21:00","available":true}]'::jsonb);
+  select role into role_ from public.profiles where id = auth.uid();
+  select status into st from public.restaurant_requests where kakao_place_id = '9900000555';
+  select source into src from public.solo_policies where restaurant_id = rid;
+  raise notice '% newowner: 등록 → owner 승격(%), 요청 등록됨(%), 출처 %',
+    case when role_ = 'owner' and st = 'registered' and src = 'owner_registered' then 'PASS' else 'FAIL' end, role_, st, src;
+  select count(*) into n from public.nearby_restaurants(37.31, 126.83, 1000) where id = rid;
+  raise notice '% newowner: 등록 즉시 손님 화면에 공개 (%)', case when n = 1 then 'PASS' else 'FAIL' end, n;
+
+  begin
+    perform public.owner_save_restaurant(null, '9900000556', '두번째', '안산', 37.31, 126.83, null, '기타',
+      '[{"name":"a","solo_price":9000}]'::jsonb, '[{"day_type":"all","start_time":"11:00","end_time":"21:00","available":true}]'::jsonb);
+    raise notice 'FAIL newowner: 식당 두 개 등록됨';
+  exception when unique_violation then raise notice 'PASS newowner: 사장님 한 명당 식당 하나';
+  end;
+
+  -- 수정: 메뉴·규칙 교체, 위치는 그대로
+  perform public.owner_save_restaurant(rid, null, '새 사장님 식당(수정)', '무시됨', 0, 0, null, '고깃집',
+    '[{"name":"정식 1인","solo_price":9500},{"name":"제육 1인","solo_price":10000}]'::jsonb,
+    '[{"day_type":"weekday","start_time":"11:00","end_time":"15:00","available":true}]'::jsonb);
+  select count(*) into n from public.solo_menu_items where restaurant_id = rid;
+  raise notice '% newowner: 내 식당 수정(메뉴 2개, 주소·위치 유지) (메뉴 %개, 주소 %)',
+    case when n = 2 and (select address from public.restaurants where id = rid) = '경기도 안산시 단원구' then 'PASS' else 'FAIL' end, n,
+    (select address from public.restaurants where id = rid);
+  begin
+    perform public.owner_save_restaurant('00000000-0000-0000-0000-000000000001', null, '남의 식당', 'x', 0, 0, null, '기타',
+      '[{"name":"a","solo_price":9000}]'::jsonb, '[{"day_type":"all","start_time":"11:00","end_time":"21:00","available":true}]'::jsonb);
+    raise notice 'FAIL newowner: 남의 식당 수정이 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS newowner: 남의 식당은 수정 불가';
+  end;
+  select count(*) into n from public.restaurant_daily_stats where restaurant_id = rid;
+  raise notice 'PASS newowner: 자기 식당 통계 읽기 가능 (%행)', n;
+end $$;
+
+-- 다른 손님: 이미 사장님이 있는 식당 조회 → has_owner, 누구인지는 모름
+select set_config('request.jwt.claims', '{"sub":"eeeeeeee-0000-0000-0000-0000000000e2","role":"authenticated"}', true) as _claims \gset
+do $$
+declare r record;
+begin
+  select * into r from public.owner_place_lookup('9900000555');
+  raise notice '% other: 사장님 있는 식당 → has_owner=true, is_mine=false', case when r.has_owner and not r.is_mine then 'PASS' else 'FAIL' end;
+end $$;
+reset role;
 
 rollback;

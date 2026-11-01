@@ -68,3 +68,11 @@
 - `detail/confirm-box.tsx` — "오늘도 됐어요 / 안 됐어요" (API 호출, 하루 1회 안내, 집계 바로 갱신)
 - `detail/report-sheet.tsx` — 정보가 다를 때 제보 (빠른 선택 + 자유 글, 로그인)
 - `detail/stats.ts` — `bumpStat()` (increment_restaurant_stat)
+
+## 5단계(사장님) 때 만든 파일
+
+- `owner/owner-wizard.tsx` — 등록 3단계 / 수정 (진행 표시, 임시 저장, 요청 수 배너, 연결 요청)
+- `owner/owner-values.ts`, `owner/owner-schema.ts` — 폼 값·zod 스키마 (서버·클라이언트 공용)
+- `owner/actions.ts` — 저장(owner_save_restaurant), 연결 요청, 일시중단
+- `owner/print-button.tsx` — 스티커 인쇄
+- `admin/claim-actions.ts` — 연결 요청 승인/거절, 제보 처리 완료

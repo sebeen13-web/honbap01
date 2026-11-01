@@ -391,7 +391,10 @@ export function RequestScreen() {
 
       <aside className="mt-8 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800">
         <p className="font-semibold">사장님이신가요?</p>
-        <p className="mt-1">식당을 등록하면 요청한 손님들께 알려드려요. (사장님 등록은 곧 열려요)</p>
+        <p className="mt-1">식당을 등록하면 요청한 손님들께 알려드려요.</p>
+        <Link href="/owner/register" className="btn-secondary mt-3">
+          내 식당 등록하기
+        </Link>
       </aside>
     </main>
   );

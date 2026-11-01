@@ -49,7 +49,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     );
   }
 
-  const [{ data: profile }, { data: owned }, { data: favorites }, { data: votes }] = await Promise.all([
+  const [{ data: profile }, { data: owned }, { data: favorites }, { data: votes }, { data: pendingClaim }] = await Promise.all([
     supabase.from("profiles").select("nickname").eq("id", user.id).maybeSingle(),
     supabase.from("restaurants").select("name").eq("owner_id", user.id).maybeSingle(),
     supabase
@@ -63,6 +63,13 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
       .select("created_at, restaurant_requests(id, name, address, status, vote_count, restaurant_id)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("restaurant_claims")
+      .select("restaurants(name)")
+      .eq("owner_id", user.id)
+      .eq("status", "pending")
+      .limit(1)
+      .maybeSingle(),
   ]);
   const provider = String(user.app_metadata?.provider ?? "email");
   const favs = favorites ?? [];
@@ -90,6 +97,34 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           {owned ? <span className="text-gray-700"> · {owned.name}</span> : null}
         </dd>
       </dl>
+
+      {/* 사장님 */}
+      <section className="mt-6 rounded-xl border border-gray-200 p-4" aria-labelledby="owner-title">
+        <h2 id="owner-title" className="text-base font-bold text-gray-900">
+          사장님이신가요?
+        </h2>
+        {owned ? (
+          <>
+            <p className="mt-1 text-sm text-gray-700">‘{owned.name}’ 사장님 화면에서 메뉴·시간을 고치고, 손님 반응과 스티커를 볼 수 있어요.</p>
+            <Link href="/owner" className="btn-primary mt-3 w-full">
+              사장님 화면으로
+            </Link>
+          </>
+        ) : pendingClaim ? (
+          <p className="mt-1 text-sm text-amber-900">
+            ‘{pendingClaim.restaurants?.name ?? "식당"}’ 연결 요청을 검토하고 있어요. 승인되면 사장님 화면이 열려요.
+          </p>
+        ) : (
+          <>
+            <p className="mt-1 text-sm text-gray-700">
+              1인분 되는 우리 가게를 5분 만에 등록하세요. 등록하면 지도에 바로 보이고, 요청한 손님들께도 ‘등록됐어요’로 알려져요.
+            </p>
+            <Link href="/owner/register" className="btn-secondary mt-3 w-full">
+              내 식당 등록하기
+            </Link>
+          </>
+        )}
+      </section>
 
       {/* 저장한 식당 */}
       <section className="mt-6" aria-labelledby="fav-title">

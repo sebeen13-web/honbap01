@@ -18,6 +18,7 @@ supabase/
   tests/rls_checks.sql                 # 역할별 권한 + 시간대 규칙 점검 (rollback 되어 데이터 안 남음)
   migrations/20261103000000_customer_accounts.sql  # 손님 로그인: 역할 user/owner/admin, 닉네임, 즐겨찾기, 확인=user_id 기준, 탈퇴
   migrations/20261104000000_home_and_requests.sql  # 카카오 장소 id, 식당 요청·+1, nearby 에 등록일
+  migrations/20261106000000_owner.sql  # 사장님 등록·수정 함수, 카카오 장소 조회
 docs/ROADMAP.md                        # 차별점과 3~6단계 화면 명세 (이후 단계는 이 문서를 따른다)
 src/
   app/                                 # 라우트 (/, /restaurants/[id], /owner, /admin ...)
@@ -25,6 +26,8 @@ src/
   app/(guest)/(tabs)/                  # 하단 탭 화면: / (홈), /map (지도), /request (요청), /me (내 정보)
   app/(guest)/restaurants/[id]/        # 식당 상세 (탭 없음, 뒤로가기)
   app/api/restaurants/[id]/confirm/    # "오늘도 됐어요/안 됐어요" 등록 API (로그인, 하루 1회)
+  app/owner/                           # 사장님: 대시보드, register(3단계 등록), edit, sticker(A4 인쇄)
+  app/admin/(protected)/claims, review # 관리자: 연결 요청 승인, 확인 필요 식당·제보
   app/admin/login                      # 관리자 로그인 (보호 대상 아님)
   app/admin/(protected)/               # 관리자 전용: layout 에서 requireAdmin()
     restaurants/ , restaurants/new , restaurants/[id]/edit
@@ -169,3 +172,12 @@ psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f supabase/tests/r
 
 ## 약관·개인정보 처리방침
 `/terms`, `/privacy` 는 **법률 검토 전 초안**이다. 운영자 이름·연락처(`[…]` 부분)를 채우고, 서비스 공개 전에 전문가 검토를 받는다.
+
+## 사장님 (5단계)
+
+- 손님 계정의 **내 정보 > 내 식당 등록하기** (`/owner/register`): ① 가게 검색(카카오 장소) ② 1인분 메뉴 ③ 1인분 되는 시간, 3단계.
+  등록하면 서버가 역할을 owner 로 바꾸고, 같은 카카오 장소의 손님 요청은 ‘등록됨’이 된다. 작성 중인 내용은 그 브라우저에 자동 임시 저장.
+- 이미 관리자가 조사해 둔 식당이면 새로 등록하지 않고 **내 식당으로 연결 요청** → 관리자 `/admin/claims` 에서 가게 전화로 확인 후 승인.
+- 대시보드(`/owner`): 최근 7·30일 상세 조회·길찾기·전화, ‘오늘도 됐어요’ 집계, 내 식당 요청 수, 연결 요청 상태, 일시중단.
+- 스티커(`/owner/sticker`): A4 1쪽 큰 스티커 + 1쪽 작은 스티커 8개(90×60mm), 식당 상세로 가는 QR.
+  **QR 주소는 `NEXT_PUBLIC_SITE_URL`(배포 주소)** 을 쓴다. 비워 두면 지금 접속한 주소(localhost)라 손님 휴대폰에서 열리지 않는다.

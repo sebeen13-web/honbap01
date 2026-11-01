@@ -64,3 +64,11 @@ body {
 @theme {
   --color-kakao: #fee500;
 }
+
+/* 인쇄 (사장님 스티커): A4, 여백 10mm */
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+}
