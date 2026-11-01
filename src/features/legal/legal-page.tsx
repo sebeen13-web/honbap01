@@ -5,7 +5,7 @@ export function LegalPage({ title, updated, children }: { title: string; updated
   return (
     <main className="mx-auto max-w-2xl px-4 py-6 text-gray-900">
       <Link href="/" className="text-sm text-gray-700 underline underline-offset-2">
-        ← 지도로
+        ← 홈으로
       </Link>
       <h1 className="mt-4 text-2xl font-bold">{title}</h1>
       <p className="mt-1 text-sm text-gray-600">시행일: {updated} · 초안(법률 검토 전)</p>

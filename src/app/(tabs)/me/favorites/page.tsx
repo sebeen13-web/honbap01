@@ -17,7 +17,7 @@ export default async function FavoritesPage() {
   const rows = data ?? [];
 
   return (
-    <main className="mx-auto max-w-md px-4 py-6">
+    <main className="mx-auto max-w-md px-4 pt-[max(env(safe-area-inset-top),1rem)] pb-8">
       <Link href="/me" className="text-sm text-gray-700 underline underline-offset-2">
         ← 내 정보
       </Link>
@@ -31,7 +31,7 @@ export default async function FavoritesPage() {
         <div className="mt-6 rounded-xl bg-gray-50 p-6 text-center text-sm text-gray-700">
           <p>아직 저장한 식당이 없어요.</p>
           <p className="mt-1">지도에서 식당 카드의 ♡ 를 눌러 저장해 보세요.</p>
-          <Link href="/" className="btn-primary mt-4">
+          <Link href="/map" className="btn-primary mt-4">
             지도로 가기
           </Link>
         </div>

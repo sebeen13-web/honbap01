@@ -148,6 +148,12 @@ export const restaurantFormSchema = z
     extra_fee_note: optionalText(NOTE_MAX, "추가 요금 메모"),
     /** null = 영업시간 정보 없음 (선택 항목) */
     business_hours: businessHoursSchema.nullable(),
+    /** 카카오 장소 id (상호 검색으로 고르면 채워짐). 요청과 연결하는 데 쓴다 */
+    kakao_place_id: z
+      .string()
+      .trim()
+      .regex(/^(\d{1,20})?$/, "카카오 장소 정보가 올바르지 않아요. 상호명으로 다시 검색해 주세요.")
+      .transform((v) => (v === "" ? null : v)),
   })
   .superRefine((v, ctx) => {
     if (v.time_slot === "custom" && !v.time_slot_note) {

@@ -51,11 +51,15 @@ export async function saveRestaurantAction(id: string | null, input: unknown): P
     // 순서대로 sort_order 가 매겨진다
     p_menus: v.menus,
     p_time_rules: v.time_rules,
+    p_kakao_place_id: v.kakao_place_id,
   });
 
   if (error) {
     console.error("[admin_save_restaurant]", error);
     if (error.code === "42501") return { ok: false, message: "관리자 권한이 없어 저장하지 못했어요. 다시 로그인해 주세요." };
+    if (error.code === "23505" && /kakao_place_id/.test(error.message)) {
+      return { ok: false, message: "이미 같은 카카오 장소로 등록된 식당이 있어요. 목록에서 그 식당을 수정해 주세요." };
+    }
     if (error.code === "P0002") return { ok: false, message: "식당을 찾을 수 없어요. 이미 삭제되었을 수 있어요." };
     if (error.code === "23514") {
       // DB 가 보낸 한국어 안내(개수 제한 등)는 그대로 보여준다
@@ -66,6 +70,7 @@ export async function saveRestaurantAction(id: string | null, input: unknown): P
   }
 
   revalidatePath("/admin/restaurants");
+  revalidatePath("/admin/requests");
   revalidatePath("/");
   redirect(`/admin/restaurants?saved=${restaurantId ? "updated" : "created"}`);
 }

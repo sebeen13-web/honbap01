@@ -1,38 +1,45 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DEFAULT_CENTER, DEFAULT_RADIUS_M, RADIUS_OPTIONS_M } from "@/lib/constants";
-import { useUserLocation, type LatLng } from "@/features/location/use-user-location";
-import { KakaoMap, type MapOrigin } from "@/features/map/kakao-map";
+import { DEFAULT_CENTER, RADIUS_OPTIONS_M } from "@/lib/constants";
+import type { LatLng } from "@/features/location/use-user-location";
+import { KakaoMap } from "@/features/map/kakao-map";
 import { AddressSearch } from "@/features/map/address-search";
 import { BottomSheet, type SheetSnap } from "@/features/restaurants/bottom-sheet";
 import { FilterBar } from "@/features/restaurants/filter-bar";
 import { RestaurantCard } from "@/features/restaurants/restaurant-card";
-import { applyFilters, EMPTY_FILTERS, type RestaurantFilters, type SortKey } from "@/features/restaurants/filters";
-import { useAuth } from "@/features/auth/use-auth";
+import { applyFilters, EMPTY_FILTERS } from "@/features/restaurants/filters";
 import { AuthButton } from "@/features/auth/auth-button";
-import { LoginPromptSheet } from "@/features/auth/login-prompt-sheet";
-import { useFavorites } from "@/features/favorites/use-favorites";
 import { formatRadius } from "@/features/restaurants/format";
-import { useNearbyRestaurants } from "@/features/restaurants/use-nearby-restaurants";
-
-type SearchOrigin = { coords: LatLng; label: string };
+import { useNearby } from "@/features/nearby/nearby-context";
 
 /**
- * 손님 메인 화면: 지도(위) + 필터 칩(위) + 목록 바텀시트(아래). 로그인 없이 쓴다(즐겨찾기만 로그인 필요).
- * 손님 좌표는 이 컴포넌트의 메모리에만 있고, 조회 요청 외에는 어디에도 보내거나 저장하지 않는다.
+ * 지도 탭: 지도(위) + 필터 칩(위) + 목록 바텀시트(아래). 로그인 없이 쓴다(즐겨찾기만 로그인 필요).
+ * 위치·조회 결과·필터는 NearbyProvider 가 들고 있어 탭을 옮겨도 유지된다(좌표는 메모리에만).
  */
-export function NearbyScreen({ kakaoAppKey }: { kakaoAppKey: string | null }) {
-  const location = useUserLocation();
-  const [mode, setMode] = useState<"me" | "search">("me");
-  const [searchOrigin, setSearchOrigin] = useState<SearchOrigin | null>(null);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [radiusM, setRadiusM] = useState<number>(DEFAULT_RADIUS_M);
-  const [filters, setFilters] = useState<RestaurantFilters>(EMPTY_FILTERS);
-  const [sort, setSort] = useState<SortKey>("distance");
-  const [loginPrompt, setLoginPrompt] = useState(false);
-  const auth = useAuth();
-  const favorites = useFavorites(auth.status === "user" ? auth.userId : null);
+export function NearbyScreen() {
+  const {
+    kakaoAppKey,
+    location: loc,
+    findMe,
+    pickArea: onPickArea,
+    searchOpen,
+    setSearchOpen,
+    origin,
+    radiusM,
+    setRadiusM,
+    nearby,
+    retry,
+    filters,
+    setFilters,
+    sort,
+    setSort,
+    pendingFocusId,
+    setPendingFocusId,
+    auth,
+    favorites,
+    requireLogin,
+  } = useNearby();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [snap, setSnap] = useState<SheetSnap>("mid");
   const [sheetH, setSheetH] = useState(0);
@@ -41,21 +48,9 @@ export function NearbyScreen({ kakaoAppKey }: { kakaoAppKey: string | null }) {
   const topRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef(new Map<string, HTMLLIElement>());
 
-  const loc = location.state;
-  const me = loc.status === "success" ? loc.coords : null;
-
-  // 기준점: 마지막으로 고른 방법(내 위치 / 동네 검색)
-  const origin: (MapOrigin & { label: string }) | null =
-    mode === "me" && me
-      ? { kind: "me", coords: me, label: "내 위치" }
-      : searchOrigin
-        ? { kind: "search", coords: searchOrigin.coords, label: searchOrigin.label }
-        : null;
-
-  const { state: nearby, retry } = useNearbyRestaurants(origin?.coords ?? null, radiusM);
   const { rows: visible, excludedUnknownTime } = useMemo(() => applyFilters(nearby.rows, filters, sort), [nearby.rows, filters, sort]);
   const locationFailed = loc.status === "denied" || loc.status === "error";
-  const showSearch = searchOpen || locationFailed || mode === "search";
+  const showSearch = searchOpen || (locationFailed && !origin) || origin?.kind === "search";
 
   // 위쪽 바(제목+필터) 높이 측정 → 시트 최대 높이·지도 여백
   useEffect(() => {
@@ -72,20 +67,11 @@ export function NearbyScreen({ kakaoAppKey }: { kakaoAppKey: string | null }) {
   }, [locationFailed]);
 
   // 새 조회 결과가 오면 선택 해제
+  const rowsRef = useRef(nearby.rows);
   useEffect(() => {
-    setSelectedId(null);
+    if (rowsRef.current !== nearby.rows) setSelectedId(null);
+    rowsRef.current = nearby.rows;
   }, [nearby.rows]);
-
-  const findMe = useCallback(() => {
-    setMode("me");
-    setSearchOpen(false);
-    location.request();
-  }, [location]);
-
-  const onPickArea = useCallback((coords: LatLng, label: string) => {
-    setSearchOrigin({ coords, label });
-    setMode("search");
-  }, []);
 
   // 지도 마커 → 카드 강조 + 시트 올리기 + 카드가 보이게 스크롤
   const onMarkerSelect = useCallback((id: string) => {
@@ -99,18 +85,29 @@ export function NearbyScreen({ kakaoAppKey }: { kakaoAppKey: string | null }) {
   // 목록 카드 → 지도에서 그 식당으로 이동 (시트가 지도를 다 가리고 있으면 중간으로 내림)
   const onCardSelect = useCallback(
     (id: string) => {
-      const r = visible.find((x) => x.id === id);
+      const r = visible.find((x) => x.id === id) ?? nearby.rows.find((x) => x.id === id);
       if (!r) return;
       setSelectedId(id);
       setSnap((s) => (s === "max" ? "mid" : s));
       setFocus((f) => ({ coords: { lat: r.latitude, lng: r.longitude }, token: (f?.token ?? 0) + 1 }));
     },
-    [visible],
+    [visible, nearby.rows],
   );
+
+  // 홈에서 식당 카드를 눌러 왔으면 그 식당을 고르고 지도를 옮긴다
+  useEffect(() => {
+    if (!pendingFocusId || nearby.status !== "success") return;
+    if (nearby.rows.some((r) => r.id === pendingFocusId)) {
+      if (!visible.some((r) => r.id === pendingFocusId)) setFilters(EMPTY_FILTERS);
+      onCardSelect(pendingFocusId);
+      requestAnimationFrame(() => cardRefs.current.get(pendingFocusId)?.scrollIntoView({ block: "nearest" }));
+    }
+    setPendingFocusId(null);
+  }, [pendingFocusId, nearby.status, nearby.rows, visible, onCardSelect, setPendingFocusId, setFilters]);
 
   const nextRadius = RADIUS_OPTIONS_M.find((r) => r > radiusM);
   const fitKey = origin ? `${origin.coords.lat},${origin.coords.lng},${radiusM}` : "none";
-  const showFab = (loc.status !== "idle" || searchOrigin !== null) && snap !== "max";
+  const showFab = (loc.status !== "idle" || origin !== null) && snap !== "max";
 
   const header = (
     <div className="px-4 pb-3">
@@ -154,7 +151,7 @@ export function NearbyScreen({ kakaoAppKey }: { kakaoAppKey: string | null }) {
   );
 
   return (
-    <main className="relative h-dvh overflow-hidden">
+    <main className="absolute inset-0 overflow-hidden">
       <KakaoMap
         appKey={kakaoAppKey}
         defaultCenter={DEFAULT_CENTER}
@@ -175,7 +172,7 @@ export function NearbyScreen({ kakaoAppKey }: { kakaoAppKey: string | null }) {
       >
         <div className="flex items-center justify-between gap-2 py-1">
           <h1 className="text-lg font-bold text-primary-strong">혼밥 지도</h1>
-          <AuthButton auth={auth} />
+          <AuthButton auth={auth} next="/map" />
         </div>
         <FilterBar filters={filters} onChange={setFilters} />
       </div>
@@ -217,7 +214,7 @@ export function NearbyScreen({ kakaoAppKey }: { kakaoAppKey: string | null }) {
             </div>
           ) : null}
 
-          {loc.status === "loading" && mode === "me" ? (
+          {loc.status === "loading" ? (
             <p className="flex items-center gap-2 rounded-xl bg-gray-50 p-4 text-sm text-gray-700" role="status">
               <span className="size-4 animate-spin rounded-full border-2 border-gray-300 border-t-primary" aria-hidden />
               현재 위치를 확인하고 있어요… 브라우저가 위치 권한을 물으면 ‘허용’을 눌러 주세요.
@@ -227,7 +224,7 @@ export function NearbyScreen({ kakaoAppKey }: { kakaoAppKey: string | null }) {
           {/* 위치 거부/오류 또는 직접 검색: 안내 + 동네 검색 */}
           {showSearch ? (
             <div className="space-y-2">
-              {locationFailed && mode === "me" ? (
+              {locationFailed && origin?.kind !== "search" ? (
                 <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
                   <p className="font-semibold">{loc.message}</p>
                   {loc.status === "denied" ? (
@@ -329,8 +326,14 @@ export function NearbyScreen({ kakaoAppKey }: { kakaoAppKey: string | null }) {
                         onSelect={() => onCardSelect(r.id)}
                         favorite={favorites.ids.has(r.id)}
                         onToggleFavorite={() => {
-                          if (auth.status === "user") void favorites.toggle(r.id);
-                          else setLoginPrompt(true);
+                          if (
+                            requireLogin({
+                              title: "로그인하면 저장할 수 있어요",
+                              description: "즐겨찾기한 식당은 ‘내 정보’에서 다시 볼 수 있어요. 둘러보기는 로그인 없이 가능해요.",
+                              next: "/map",
+                            })
+                          )
+                            void favorites.toggle(r.id);
                         }}
                       />
                     ))}
@@ -342,13 +345,6 @@ export function NearbyScreen({ kakaoAppKey }: { kakaoAppKey: string | null }) {
         </div>
       </BottomSheet>
 
-      <LoginPromptSheet
-        open={loginPrompt}
-        onClose={() => setLoginPrompt(false)}
-        title="로그인하면 저장할 수 있어요"
-        description="즐겨찾기한 식당은 ‘내 정보 > 즐겨찾기’에서 다시 볼 수 있어요. 둘러보기는 로그인 없이 가능해요."
-        next="/"
-      />
     </main>
   );
 }

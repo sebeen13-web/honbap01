@@ -15,11 +15,23 @@ export type KakaoPlaceResult = {
   id: string;
   place_name: string;
   category_name: string;
+  /** FD6 = 음식점, CE7 = 카페 … */
+  category_group_code?: string;
+  place_url?: string;
+  /** location 을 넘겼을 때 기준점과의 거리(m, 문자열) */
+  distance?: string;
   phone: string;
   address_name: string;
   road_address_name: string;
   x: string;
   y: string;
+};
+
+export type KakaoRegionResult = {
+  region_type: "H" | "B";
+  region_1depth_name: string;
+  region_2depth_name: string;
+  region_3depth_name: string;
 };
 
 export interface KakaoLatLng {
@@ -98,12 +110,20 @@ export type KakaoNamespace = {
           callback: (result: KakaoAddressResult[], status: KakaoStatus) => void,
           options?: { size?: number },
         ) => void;
+        /** 좌표 → 행정구역 (x = 경도, y = 위도) */
+        coord2RegionCode: (x: number, y: number, callback: (result: KakaoRegionResult[], status: KakaoStatus) => void) => void;
       };
       Places: new () => {
         keywordSearch: (
           query: string,
           callback: (result: KakaoPlaceResult[], status: KakaoStatus) => void,
-          options?: { size?: number },
+          options?: {
+            size?: number;
+            location?: KakaoLatLng;
+            /** 미터, 최대 20000 */
+            radius?: number;
+            category_group_code?: string;
+          },
         ) => void;
       };
     };

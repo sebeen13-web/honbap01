@@ -4,8 +4,10 @@
 --   1 혼고기 중앙점  : 관리자 확인, 메뉴 3개, 평일 저녁 피크(18~20시) 1인분 불가 규칙, 확인 ok 다수
 --   2 한그릇 샤브    : 사장님 등록, 점심만 가능, 최근 7일 통계
 --   3 1인 회센터     : 관리자 확인, 평일 14~17시만, 최근 14일 '안 됐어요' 3건 → needs_review
---   샘플 손님 5명(로그인 불가) : 확인 기록·즐겨찾기 예시
 --   4 일시중단 식당  : is_active = false (손님 화면에 안 보임)
+--   샘플 손님 5명(로그인 불가) : 확인 기록·즐겨찾기·요청 예시
+--   샘플 요청 4건 : 요청 중 2건(3명/1명), 등록됨 1건(샘플 1 과 연결), 조사 완료(closed) 1건
+--   카카오 장소 id 는 가짜 값(9900000001~)이다.
 
 insert into public.restaurants (id, name, address, latitude, longitude, phone, category, business_hours) values
   ('00000000-0000-0000-0000-000000000001', '(샘플) 혼고기 중앙점', '경기도 안산시 단원구 중앙대로 900', 37.3168, 126.8390, '031-000-0001', '고깃집',
@@ -14,6 +16,12 @@ insert into public.restaurants (id, name, address, latitude, longitude, phone, c
    '{"mon":{"open":"11:00","close":"21:00"},"tue":{"open":"11:00","close":"21:00"},"wed":{"open":"11:00","close":"21:00"},"thu":{"open":"11:00","close":"21:00"},"fri":{"open":"11:00","close":"21:00"},"sat":{"open":"11:00","close":"21:00"},"sun":{"open":"11:00","close":"21:00"}}'),
   ('00000000-0000-0000-0000-000000000003', '(샘플) 1인 회센터', '경기도 안산시 상록구 용신로 200', 37.3010, 126.8460, null, '회', null),
   ('00000000-0000-0000-0000-000000000004', '(샘플) 일시중단 식당', '경기도 안산시 단원구 고잔로 50', 37.3170, 126.8380, null, '기타', null);
+
+-- 카카오 장소 id(가짜), 등록일 다양하게 (홈의 '새로 등록된 곳'은 최근 14일)
+update public.restaurants set kakao_place_id = '9900000001', created_at = now() - interval '3 days'  where id = '00000000-0000-0000-0000-000000000001';
+update public.restaurants set kakao_place_id = '9900000002', created_at = now() - interval '20 days' where id = '00000000-0000-0000-0000-000000000002';
+update public.restaurants set kakao_place_id = '9900000003', created_at = now() - interval '45 days' where id = '00000000-0000-0000-0000-000000000003';
+update public.restaurants set kakao_place_id = '9900000004', created_at = now() - interval '60 days' where id = '00000000-0000-0000-0000-000000000004';
 
 insert into public.solo_policies (restaurant_id, time_slot, time_slot_note, extra_fee, extra_fee_note, is_active, source) values
   ('00000000-0000-0000-0000-000000000001', 'all_day', null, true, '1인분은 상차림비가 포함된 가격', true, 'admin_checked'),
@@ -75,6 +83,22 @@ insert into public.solo_confirmations (restaurant_id, user_id, result, created_a
 insert into public.favorites (user_id, restaurant_id) values
   ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-000000000001'),
   ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-000000000002');
+
+-- 요청 ("여기도 1인분 되게 해주세요")
+insert into public.restaurant_requests (id, kakao_place_id, name, address, latitude, longitude, category, status, vote_count, restaurant_id, created_at, created_by) values
+  ('00000000-0000-0000-0000-0000000000b1', '9900000101', '(샘플 요청) 고기굽는집 중앙점', '경기도 안산시 단원구 중앙대로 920', 37.3175, 126.8402, '고깃집', 'open', 0, null, now() - interval '6 days', '00000000-0000-0000-0000-0000000000a1'),
+  ('00000000-0000-0000-0000-0000000000b2', '9900000102', '(샘플 요청) 바다횟집', '경기도 안산시 상록구 용신로 230', 37.3022, 126.8471, '회', 'open', 0, null, now() - interval '2 days', '00000000-0000-0000-0000-0000000000a2'),
+  ('00000000-0000-0000-0000-0000000000b3', '9900000001', '(샘플) 혼고기 중앙점', '경기도 안산시 단원구 중앙대로 900', 37.3168, 126.8390, '고깃집', 'registered', 0, '00000000-0000-0000-0000-000000000001', now() - interval '30 days', '00000000-0000-0000-0000-0000000000a3'),
+  ('00000000-0000-0000-0000-0000000000b4', '9900000103', '(샘플 요청) 2인 이상 전골집', '경기도 안산시 단원구 고잔로 70', 37.3181, 126.8366, '기타', 'closed', 0, null, now() - interval '40 days', '00000000-0000-0000-0000-0000000000a4');
+-- 투표 → 트리거가 vote_count 를 다시 센다 (b1: 3명, b2: 1명, b3: 2명, b4: 1명)
+insert into public.restaurant_request_votes (user_id, request_id) values
+  ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000b1'),
+  ('00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000b1'),
+  ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000b1'),
+  ('00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000b2'),
+  ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000b3'),
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000000b3'),
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000000b4');
 
 -- 사장님 통계 (최근 7일)
 insert into public.restaurant_daily_stats (restaurant_id, day, views, directions_clicks, phone_taps)

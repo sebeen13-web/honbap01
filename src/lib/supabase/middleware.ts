@@ -38,8 +38,8 @@ export async function updateSession(request: NextRequest) {
   const isAdminArea = under(ADMIN_PREFIX);
   const isAdminLogin = pathname === ADMIN_LOGIN_PATH;
 
-  // 로그인이 필요한 손님/사장님 영역: /me, /owner
-  if ((under("/me") || under("/owner")) && !user) {
+  // 로그인이 필요한 손님/사장님 영역: /me 하위(/me/favorites …), /owner. (/me 자체는 비로그인에게 로그인 안내를 보여준다)
+  if ((pathname.startsWith("/me/") || under("/owner")) && !user) {
     return redirectWithCookies(request, response, "/login", { next: `${pathname}${search}` });
   }
   // /owner: 사장님 등록·연결 요청 화면(/owner/register, /owner/claim)은 손님도, 나머지는 owner/admin 만 (5단계)

@@ -17,10 +17,12 @@ supabase/
   seed.sql                             # 샘플 식당 4곳 (메뉴·가격·시간대 규칙·확인·통계 포함)
   tests/rls_checks.sql                 # 역할별 권한 + 시간대 규칙 점검 (rollback 되어 데이터 안 남음)
   migrations/20261103000000_customer_accounts.sql  # 손님 로그인: 역할 user/owner/admin, 닉네임, 즐겨찾기, 확인=user_id 기준, 탈퇴
+  migrations/20261104000000_home_and_requests.sql  # 카카오 장소 id, 식당 요청·+1, nearby 에 등록일
 docs/ROADMAP.md                        # 차별점과 3~6단계 화면 명세 (이후 단계는 이 문서를 따른다)
 src/
   app/                                 # 라우트 (/, /restaurants/[id], /owner, /admin ...)
-  app/page.tsx                         # 손님 메인: 지도 + 목록 시트 + 필터 (3단계)
+  app/(tabs)/                          # 하단 탭 화면: / (홈), /map (지도), /request (요청), /me (내 정보)
+  app/(tabs)/layout.tsx                # NearbyProvider + 하단 탭 (탭을 옮겨도 위치·조회 결과 유지)
   app/admin/login                      # 관리자 로그인 (보호 대상 아님)
   app/admin/(protected)/               # 관리자 전용: layout 에서 requireAdmin()
     restaurants/ , restaurants/new , restaurants/[id]/edit
@@ -37,6 +39,8 @@ src/
 |---|---|
 | `profiles` | 가입 시 자동 생성, `role` = user(기본) / owner / admin, `nickname`(카카오 닉네임, 없으면 "익명의 혼밥러"). 사용자는 자기 역할을 바꿀 수 없음. owner 승격은 식당 연결 시 트리거만 |
 | `favorites` | 즐겨찾기 (본인 것만 읽기/쓰기, 공개 식당만 추가) |
+| `restaurant_requests` | "1인분 되게 해주세요" 요청. 누구나 읽기(요청자는 비공개), 만들기는 `create_restaurant_request()`(로그인, 하루 5개). 같은 `kakao_place_id` 로 식당이 등록되면 자동 '등록됨' |
+| `restaurant_request_votes` | 요청 +1. 본인 것만 보기/추가/취소. `vote_count` 는 트리거가 다시 셈 |
 | `restaurants` | `location`(geography) 은 위도·경도로 자동 계산되는 생성 컬럼 + GIST 인덱스. `business_hours`(jsonb) 로 '영업 중' 판단. `owner_id` unique → 사장님당 1개 |
 | `solo_policies` | 식당당 1개. `is_active=false` = 사장님 일시중단 **또는** 관리자 숨김. `source`/`last_verified_at` 은 트리거가 로그인 역할로 결정 (클라이언트 값 무시). 메뉴·시간대 규칙을 저장해도 갱신, `is_active` 만 바꾸면 유지 |
 | `solo_menu_items` | 1인분 메뉴·가격 (식당당 최대 10개). `solo_price` 1인분 가격, `regular_price_per_person` 보통 1인당 가격, `normal_min_servings` 원래 최소 인분 |

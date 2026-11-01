@@ -8,15 +8,19 @@ const ORDER: SheetSnap[] = ["min", "mid", "max"];
 const cycle = (s: SheetSnap): SheetSnap => (s === "max" ? "min" : ORDER[ORDER.indexOf(s) + 1]);
 const SNAP_LABEL: Record<SheetSnap, string> = { min: "접힘", mid: "중간", max: "펼침" };
 
-function useViewportHeight() {
-  const [vh, setVh] = useState(0);
+/** 시트가 들어 있는 영역(부모)의 높이. 하단 탭이 있으므로 창 높이 대신 부모 높이를 쓴다. */
+function useContainerHeight(ref: React.RefObject<HTMLElement | null>) {
+  const [h, setH] = useState(0);
   useEffect(() => {
-    const update = () => setVh(window.innerHeight);
+    const parent = ref.current?.parentElement;
+    if (!parent) return;
+    const update = () => setH(parent.clientHeight);
     update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-  return vh;
+    const ro = new ResizeObserver(update);
+    ro.observe(parent);
+    return () => ro.disconnect();
+  }, [ref]);
+  return h;
 }
 
 /**
@@ -41,7 +45,8 @@ export function BottomSheet({
   header: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const vh = useViewportHeight();
+  const sectionRef = useRef<HTMLElement>(null);
+  const vh = useContainerHeight(sectionRef);
   const headRef = useRef<HTMLDivElement>(null);
   const [headH, setHeadH] = useState(112);
   const [dragH, setDragH] = useState<number | null>(null);
@@ -134,6 +139,7 @@ export function BottomSheet({
 
   return (
     <section
+      ref={sectionRef}
       aria-label="식당 목록"
       className={`absolute inset-x-0 bottom-0 z-20 mx-auto flex max-w-xl flex-col rounded-t-2xl bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.15)] ${
         dragH === null ? "transition-[height] duration-200 ease-out motion-reduce:transition-none" : ""

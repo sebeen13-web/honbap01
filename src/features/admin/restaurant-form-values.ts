@@ -17,6 +17,8 @@ export type RestaurantFormInitial = {
   extra_fee: boolean;
   extra_fee_note: string;
   business_hours: BusinessHours | null;
+  /** 카카오 장소 id ("" = 없음) */
+  kakao_place_id: string;
 };
 
 /** 새 등록 폼의 초기값 (행 key 가 매번 새로 만들어지도록 함수로 둔다) */
@@ -34,5 +36,6 @@ export const emptyRestaurant = (): RestaurantFormInitial => ({
   extra_fee: false,
   extra_fee_note: "",
   business_hours: null,
+  kakao_place_id: "",
 });
 

@@ -163,9 +163,15 @@ export function RestaurantForm({
             <p className="block text-sm font-medium">
               주소 <span className="text-primary">*</span>
             </p>
-            <p className="mb-2 text-xs text-gray-600">검색 결과에서 주소를 고르면 위도·경도가 자동으로 입력돼요.</p>
+            <p className="mb-2 text-xs text-gray-600">
+              상호명으로 검색해 고르면 위도·경도와 카카오 장소가 함께 입력돼요(손님 요청과 연결돼요). 상호가 없으면 주소로
+              찾아도 돼요.
+            </p>
             <AddressSearch
               appKey={kakaoAppKey}
+              preferPlaces
+              label="상호명 또는 주소 검색"
+              placeholder="상호명 또는 도로명·지번 주소"
               invalid={!!(err("address") || err("latitude") || err("longitude"))}
               describedBy={err("address") || err("latitude") ? "address-error" : undefined}
               onSelect={(s) => {
@@ -177,6 +183,8 @@ export function RestaurantForm({
                   // 상호 검색으로 골랐고 비어 있으면 이름·전화번호도 채워 준다
                   name: prev.name || s.placeName || prev.name,
                   phone: prev.phone || s.phone || prev.phone,
+                  // 주소만 고르면 카카오 장소 연결은 비운다
+                  kakao_place_id: s.placeId ?? "",
                 }));
                 setErrors((prev) => {
                   const next = { ...prev };
@@ -190,6 +198,26 @@ export function RestaurantForm({
             <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-lg bg-gray-50 p-3 text-sm">
               <dt className="text-gray-600">선택한 주소</dt>
               <dd className="break-all">{v.address || <span className="text-gray-500">아직 선택하지 않았어요</span>}</dd>
+              <dt className="text-gray-600">카카오 장소</dt>
+              <dd>
+                {v.kakao_place_id ? (
+                  <span className="flex flex-wrap items-center gap-2">
+                    <a
+                      href={`https://place.map.kakao.com/${v.kakao_place_id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary-strong underline underline-offset-2"
+                    >
+                      연결됨 ({v.kakao_place_id})
+                    </a>
+                    <button type="button" className="text-xs text-gray-700 underline" onClick={() => set("kakao_place_id", "")}>
+                      연결 해제
+                    </button>
+                  </span>
+                ) : (
+                  <span className="text-gray-500">없음 (상호명으로 검색해 고르면 연결돼요)</span>
+                )}
+              </dd>
               <dt className="text-gray-600">위도·경도</dt>
               <dd>
                 {v.latitude !== null && v.longitude !== null ? (
@@ -199,9 +227,9 @@ export function RestaurantForm({
                 )}
               </dd>
             </dl>
-            {err("address") || err("latitude") || err("longitude") ? (
+            {err("address") || err("latitude") || err("longitude") || err("kakao_place_id") ? (
               <p id="address-error" className="field-error">
-                {err("address") || err("latitude") || err("longitude")}
+                {err("address") || err("latitude") || err("longitude") || err("kakao_place_id")}
               </p>
             ) : null}
           </div>

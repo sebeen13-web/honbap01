@@ -42,8 +42,10 @@ export const RestaurantCard = forwardRef<
     onSelect: () => void;
     favorite: boolean;
     onToggleFavorite: () => void;
+    /** 목록 안에서의 너비 등 */
+    className?: string;
   }
->(function RestaurantCard({ restaurant: r, selected, onSelect, favorite, onToggleFavorite }, ref) {
+>(function RestaurantCard({ restaurant: r, selected, onSelect, favorite, onToggleFavorite, className = "" }, ref) {
   const preview = r.menus.slice(0, MENU_PREVIEW);
   const more = r.menus.length - preview.length;
   const servings = servingsLine(r.normal_min_servings);
@@ -51,7 +53,7 @@ export const RestaurantCard = forwardRef<
   return (
     <li
       ref={ref}
-      className={`scroll-my-3 rounded-xl border-2 bg-white transition-colors ${selected ? "border-primary" : "border-gray-200"}`}
+      className={`scroll-my-3 rounded-xl border-2 bg-white transition-colors ${selected ? "border-primary" : "border-gray-200"} ${className}`}
     >
       <button type="button" onClick={onSelect} aria-pressed={selected} className="block w-full rounded-t-xl p-3 text-left">
         <span className="flex items-start justify-between gap-2">

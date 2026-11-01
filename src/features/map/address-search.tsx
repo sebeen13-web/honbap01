@@ -11,6 +11,9 @@ export type AddressSelection = {
   /** 장소(상호) 검색 결과를 골랐을 때만 채워진다 */
   placeName?: string;
   phone?: string;
+  /** 카카오 장소 id (상호 검색 결과를 골랐을 때만) */
+  placeId?: string;
+  category?: string;
 };
 
 type Candidate = AddressSelection & { key: string; label: string; sub?: string };
@@ -28,6 +31,7 @@ export function AddressSearch({
   describedBy,
   label = "주소 또는 상호명 검색",
   placeholder = "도로명·지번 주소 또는 상호명",
+  preferPlaces = false,
 }: {
   appKey: string | null;
   onSelect: (s: AddressSelection) => void;
@@ -36,6 +40,8 @@ export function AddressSearch({
   /** 스크린리더용 입력칸 이름 */
   label?: string;
   placeholder?: string;
+  /** true 면 상호(장소) 검색을 먼저 하고, 결과가 없을 때 주소 검색 (카카오 장소 id 를 얻기 위해) */
+  preferPlaces?: boolean;
 }) {
   const inputId = useId();
   const [query, setQuery] = useState("");
@@ -67,8 +73,14 @@ export function AddressSearch({
     setCandidates([]);
     try {
       const kakao = await loadKakaoSdk(appKey!);
-      let found = await searchAddress(kakao, q);
-      if (found.length === 0) found = await searchPlace(kakao, q);
+      let found: Candidate[];
+      if (preferPlaces) {
+        found = await searchPlace(kakao, q);
+        if (found.length === 0) found = await searchAddress(kakao, q);
+      } else {
+        found = await searchAddress(kakao, q);
+        if (found.length === 0) found = await searchPlace(kakao, q);
+      }
       setCandidates(found);
       setStatus("done");
       if (found.length === 0) setMessage("검색 결과가 없어요. 동 이름(예: 고잔동), 도로명 주소, 상호명으로 다시 검색해 보세요.");
@@ -182,6 +194,8 @@ function searchPlace(kakao: KakaoNamespace, q: string): Promise<Candidate[]> {
               longitude: Number(p.x),
               placeName: p.place_name,
               phone: p.phone || undefined,
+              placeId: p.id,
+              category: p.category_name,
             };
           }),
         );

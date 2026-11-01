@@ -16,7 +16,9 @@ insert into auth.users (id, email) values
   ('bbbbbbbb-0000-0000-0000-0000000000b2', 'owner2@test.local'),
   ('bbbbbbbb-0000-0000-0000-0000000000b3', 'owner3@test.local'),
   ('cccccccc-0000-0000-0000-0000000000c1', 'guest1@test.local'),
-  ('cccccccc-0000-0000-0000-0000000000c2', 'guest2@test.local');
+  ('cccccccc-0000-0000-0000-0000000000c2', 'guest2@test.local'),
+  ('dddddddd-0000-0000-0000-0000000000d1', 'req1@test.local'),
+  ('dddddddd-0000-0000-0000-0000000000d2', 'req2@test.local');
 update public.profiles set role = 'admin' where id = 'aaaaaaaa-0000-0000-0000-00000000000a';
 -- owner1 은 샘플 2(한그릇 샤브)의 사장님
 update public.restaurants set owner_id = 'bbbbbbbb-0000-0000-0000-0000000000b1' where id = '00000000-0000-0000-0000-000000000002';
@@ -489,6 +491,170 @@ begin
   select * into r from public.confirmation_summaries(array['00000000-0000-0000-0000-000000000001']::uuid[]);
   raise notice '% 확인 집계: 샘플 1 정상 (ok_30d=%, not_ok_30d=%, needs_review=%)',
     case when not r.needs_review and r.ok_30d = 5 and r.not_ok_30d = 1 then 'PASS' else 'FAIL' end, r.ok_30d, r.not_ok_30d, r.needs_review;
+end $$;
+
+
+-- =====================================================================
+-- 7) 요청 / +1
+-- =====================================================================
+set local role anon;
+select set_config('request.jwt.claims', '{"role":"anon"}', true) as _claims \gset
+do $$
+declare n int;
+begin
+  select count(*) into n from public.list_restaurant_requests(37.3219, 126.8309, 'popular');
+  raise notice '% anon: 요청 목록 읽기(등록됨 포함, 조사 완료 제외) (기대 3, 실제 %)', case when n = 3 then 'PASS' else 'FAIL' end, n;
+  select count(*) into n from public.restaurant_requests;
+  raise notice '% anon: 요청 테이블 읽기 (기대 4, 실제 %)', case when n = 4 then 'PASS' else 'FAIL' end, n;
+  begin
+    perform created_by from public.restaurant_requests;
+    raise notice 'FAIL anon: 요청자(created_by)가 보임';
+  exception when insufficient_privilege then raise notice 'PASS anon: 요청한 사람(created_by)은 비공개';
+  end;
+  begin
+    perform 1 from public.restaurant_request_votes;
+    raise notice 'FAIL anon: 투표 목록이 보임';
+  exception when insufficient_privilege then raise notice 'PASS anon: 누가 +1 했는지 비공개';
+  end;
+  begin
+    perform public.create_restaurant_request('9900000999', 'x', 'y', 37.3, 126.8, null);
+    raise notice 'FAIL anon: 비로그인 요청 생성이 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS anon: 요청 생성은 로그인 필요';
+  end;
+  begin
+    insert into public.restaurant_request_votes (user_id, request_id) values ('00000000-0000-0000-0000-0000000000a5', '00000000-0000-0000-0000-0000000000b2');
+    raise notice 'FAIL anon: 비로그인 +1 이 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS anon: +1 은 로그인 필요';
+  end;
+end $$;
+reset role;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"dddddddd-0000-0000-0000-0000000000d1","role":"authenticated"}', true) as _claims \gset
+do $$
+declare j jsonb; n int; c int; rid uuid; r record;
+begin
+  j := public.create_restaurant_request('9900000201', '테스트 고깃집', '경기도 안산시', 37.31, 126.83, '고깃집');
+  select vote_count into c from public.restaurant_requests where kakao_place_id = '9900000201';
+  raise notice '% req1: 새 요청 → created, 요청 1명 (%, %)', case when j->>'result' = 'created' and c = 1 then 'PASS' else 'FAIL' end, j->>'result', c;
+  j := public.create_restaurant_request('9900000201', '테스트 고깃집', '경기도 안산시', 37.31, 126.83, '고깃집');
+  raise notice '% req1: 같은 식당 다시 요청 → already_voted (%)', case when j->>'result' = 'already_voted' then 'PASS' else 'FAIL' end, j->>'result';
+  j := public.create_restaurant_request('9900000001', '(샘플) 혼고기 중앙점', '안산', 37.31, 126.83, null);
+  raise notice '% req1: 이미 공개 중인 식당 → registered + 식당 id (%)', case when j->>'result' = 'registered' and j->>'restaurant_id' = '00000000-0000-0000-0000-000000000001' then 'PASS' else 'FAIL' end, j;
+  j := public.create_restaurant_request('9900000103', 'x', 'y', 37.31, 126.83, null);
+  raise notice '% req1: 조사 완료된 요청 → closed (%)', case when j->>'result' = 'closed' then 'PASS' else 'FAIL' end, j->>'result';
+  j := public.create_restaurant_request('9900000102', '(샘플 요청) 바다횟집', 'y', 37.30, 126.84, '회');
+  select vote_count into c from public.restaurant_requests where id = '00000000-0000-0000-0000-0000000000b2';
+  raise notice '% req1: 이미 있는 요청 → voted, 2명 (%, %)', case when j->>'result' = 'voted' and c = 2 then 'PASS' else 'FAIL' end, j->>'result', c;
+
+  begin
+    insert into public.restaurant_requests (kakao_place_id, name, address, latitude, longitude) values ('9900000299', 'x', 'y', 37.3, 126.8);
+    raise notice 'FAIL req1: 요청 테이블 직접 쓰기가 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS req1: 요청은 함수로만 생성(직접 쓰기 차단)';
+  end;
+  begin
+    update public.restaurant_requests set vote_count = 999 where id = '00000000-0000-0000-0000-0000000000b2';
+    raise notice 'FAIL req1: vote_count 조작이 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS req1: vote_count 직접 수정 불가';
+  end;
+  update public.restaurant_requests set status = 'closed' where id = '00000000-0000-0000-0000-0000000000b2';
+  get diagnostics n = row_count;
+  raise notice '% req1: 상태 변경 불가 (변경 % 행)', case when n = 0 then 'PASS' else 'FAIL' end, n;
+  begin
+    insert into public.restaurant_request_votes (user_id, request_id) values ('00000000-0000-0000-0000-0000000000a5', '00000000-0000-0000-0000-0000000000b1');
+    raise notice 'FAIL req1: 남의 명의 +1 이 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS req1: 남의 명의 +1 불가';
+  end;
+  begin
+    insert into public.restaurant_request_votes (user_id, request_id) values (auth.uid(), '00000000-0000-0000-0000-0000000000b4');
+    raise notice 'FAIL req1: 조사 완료 요청에 +1 이 허용됨';
+  exception when insufficient_privilege then raise notice 'PASS req1: 열린 요청에만 +1';
+  end;
+  insert into public.restaurant_request_votes (user_id, request_id) values (auth.uid(), '00000000-0000-0000-0000-0000000000b1');
+  select vote_count into c from public.restaurant_requests where id = '00000000-0000-0000-0000-0000000000b1';
+  raise notice '% req1: +1 → 4명 (%)', case when c = 4 then 'PASS' else 'FAIL' end, c;
+  delete from public.restaurant_request_votes where user_id = auth.uid() and request_id = '00000000-0000-0000-0000-0000000000b1';
+  select vote_count into c from public.restaurant_requests where id = '00000000-0000-0000-0000-0000000000b1';
+  raise notice '% req1: +1 취소 → 3명 (%)', case when c = 3 then 'PASS' else 'FAIL' end, c;
+  select count(*) into n from public.restaurant_request_votes;
+  raise notice '% req1: 자기 투표만 보임 (기대 2, 실제 %)', case when n = 2 then 'PASS' else 'FAIL' end, n;
+
+  select * into r from public.place_request_status(array['9900000001', '9900000101', '9900000999']) where kakao_place_id = '9900000001';
+  raise notice '% req1: 장소 상태 — 공개 식당이면 restaurant_id', case when r.restaurant_id = '00000000-0000-0000-0000-000000000001' then 'PASS' else 'FAIL' end;
+  select * into r from public.place_request_status(array['9900000101']);
+  raise notice '% req1: 장소 상태 — 요청 중 3명, 내가 안 누름', case when r.request_status = 'open' and r.vote_count = 3 and not r.i_voted then 'PASS' else 'FAIL' end;
+
+  -- 하루 5개: 오늘 1개 만들었으니 4개 더, 6번째는 거부
+  for i in 1..4 loop
+    perform public.create_restaurant_request('99000003' || i::text, '테스트 ' || i, '안산', 37.31, 126.83, null);
+  end loop;
+  begin
+    perform public.create_restaurant_request('9900000399', '6번째', '안산', 37.31, 126.83, null);
+    raise notice 'FAIL req1: 하루 6번째 새 요청이 허용됨';
+  exception when raise_exception then raise notice 'PASS req1: 새 요청 하루 5개 제한 (%)', sqlerrm;
+  end;
+  j := public.create_restaurant_request('9900000101', '(샘플 요청) 고기굽는집 중앙점', 'y', 37.31, 126.84, '고깃집');
+  raise notice '% req1: 한도 후에도 기존 요청 +1 은 가능 (%)', case when j->>'result' = 'voted' then 'PASS' else 'FAIL' end, j->>'result';
+  begin
+    perform public.admin_link_request('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-000000000003');
+    raise notice 'FAIL req1: 일반 사용자가 연결 함수를 실행함';
+  exception when insufficient_privilege then raise notice 'PASS req1: 요청 연결은 관리자만';
+  end;
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"dddddddd-0000-0000-0000-0000000000d2","role":"authenticated"}', true) as _claims \gset
+do $$
+declare n int;
+begin
+  select count(*) into n from public.restaurant_request_votes;
+  raise notice '% req2: 다른 사람 투표는 안 보임 (실제 %)', case when n = 0 then 'PASS' else 'FAIL' end, n;
+  select count(*) into n from public.list_restaurant_requests(null, null, 'popular') where i_voted;
+  raise notice '% req2: 목록의 i_voted 는 본인 기준 (실제 %)', case when n = 0 then 'PASS' else 'FAIL' end, n;
+end $$;
+reset role;
+
+-- 관리자: 상태 변경, 식당 등록/연결 시 요청 '등록됨'
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated"}', true) as _claims \gset
+do $$
+declare st text; rid uuid; newid uuid;
+begin
+  update public.restaurant_requests set status = 'closed' where kakao_place_id = '990000031';
+  select status into st from public.restaurant_requests where kakao_place_id = '990000031';
+  raise notice '% admin: 요청 조사 완료(closed) (%)', case when st = 'closed' then 'PASS' else 'FAIL' end, st;
+
+  -- 같은 카카오 장소 id 로 식당 등록 → 요청 자동 '등록됨'
+  newid := public.admin_save_restaurant(null, '바다횟집', '경기도 안산시 상록구 용신로 230', 37.3022, 126.8471, null, '회', null,
+    'all_day', null, false, null, '[{"name":"모둠회 1인","solo_price":20000}]'::jsonb, null, '9900000102');
+  select status, restaurant_id into st, rid from public.restaurant_requests where id = '00000000-0000-0000-0000-0000000000b2';
+  raise notice '% admin: 같은 장소로 식당 등록 → 요청 등록됨 + 식당 연결 (%)', case when st = 'registered' and rid = newid then 'PASS' else 'FAIL' end, st;
+
+  -- 장소 id 없는 식당에 요청 연결 → 식당에 장소 id 가 붙고 요청 등록됨
+  newid := public.admin_save_restaurant(null, '고기굽는집', '경기도 안산시 단원구 중앙대로 920', 37.3175, 126.8402, null, '고깃집', null,
+    'all_day', null, false, null, '[{"name":"삼겹 1인","solo_price":17000}]'::jsonb, null, null);
+  perform public.admin_link_request('00000000-0000-0000-0000-0000000000b1', newid);
+  select status, restaurant_id into st, rid from public.restaurant_requests where id = '00000000-0000-0000-0000-0000000000b1';
+  raise notice '% admin: 요청을 기존 식당에 연결 → 등록됨 (%), 식당 장소 id=%', case when st = 'registered' and rid = newid then 'PASS' else 'FAIL' end, st,
+    (select kakao_place_id from public.restaurants where id = newid);
+  begin
+    perform public.admin_save_restaurant(null, '중복', '안산', 37.31, 126.83, null, '기타', null,
+      'all_day', null, false, null, '[{"name":"a","solo_price":1000}]'::jsonb, null, '9900000001');
+    raise notice 'FAIL admin: 같은 카카오 장소로 식당이 두 번 등록됨';
+  exception when unique_violation then raise notice 'PASS admin: 같은 카카오 장소 중복 등록 불가';
+  end;
+end $$;
+reset role;
+
+-- 탈퇴하면 그 사람의 +1 도 빠진다
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"dddddddd-0000-0000-0000-0000000000d1","role":"authenticated"}', true) as _claims \gset
+do $$ begin perform public.delete_my_account(); end $$;
+reset role;
+do $$
+declare c int;
+begin
+  select vote_count into c from public.restaurant_requests where id = '00000000-0000-0000-0000-0000000000b1';
+  raise notice '% 탈퇴: 그 사람의 +1 이 빠짐 (b1 = %)', case when c = 3 then 'PASS' else 'FAIL' end, c;
 end $$;
 
 rollback;

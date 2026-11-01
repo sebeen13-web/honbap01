@@ -13,9 +13,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-dvh bg-gray-50">
       <header className="border-b border-gray-200 bg-white">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-4 py-3">
-          <Link href="/admin/restaurants" className="font-bold text-primary">
-            혼밥 지도 관리자
-          </Link>
+          <div className="flex items-center gap-1">
+            <Link href="/admin/restaurants" className="mr-2 font-bold text-primary-strong">
+              관리자
+            </Link>
+            <Link href="/admin/restaurants" className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-gray-800">
+              식당
+            </Link>
+            <Link href="/admin/requests" className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-gray-800">
+              요청
+            </Link>
+          </div>
           <div className="flex items-center gap-2 text-sm">
             <span className="hidden text-gray-600 sm:inline">{user.email}</span>
             <form action={adminLogoutAction}>

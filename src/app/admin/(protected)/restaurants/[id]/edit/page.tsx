@@ -22,7 +22,7 @@ export default async function EditRestaurantPage({ params }: { params: Promise<{
     .from("restaurants")
     .select(
       // 타입 추론을 위해 한 줄 문자열로 둔다
-      "id, name, address, latitude, longitude, phone, category, business_hours, owner_id, solo_policies(time_slot, time_slot_note, extra_fee, extra_fee_note, is_active, source, last_verified_at), solo_menu_items(name, solo_price, regular_price_per_person, normal_min_servings, note, sort_order), solo_time_rules(day_type, start_time, end_time, available, note, sort_order)",
+      "id, name, address, latitude, longitude, phone, category, business_hours, owner_id, kakao_place_id, solo_policies(time_slot, time_slot_note, extra_fee, extra_fee_note, is_active, source, last_verified_at), solo_menu_items(name, solo_price, regular_price_per_person, normal_min_servings, note, sort_order), solo_time_rules(day_type, start_time, end_time, available, note, sort_order)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -70,6 +70,7 @@ export default async function EditRestaurantPage({ params }: { params: Promise<{
     extra_fee: p?.extra_fee ?? false,
     extra_fee_note: p?.extra_fee_note ?? "",
     business_hours: hours.success ? hours.data : null,
+    kakao_place_id: r.kakao_place_id ?? "",
   };
 
   return (

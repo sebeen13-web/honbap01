@@ -30,7 +30,7 @@ export default async function LoginPage({
   return (
     <main className="mx-auto max-w-sm px-4 py-8">
       <Link href="/" className="text-sm text-gray-700 underline underline-offset-2">
-        ← 지도로
+        ← 홈으로
       </Link>
       <h1 className="mt-4 text-2xl font-bold text-gray-900">혼밥 지도 로그인</h1>
       <p className="mt-1 text-sm text-gray-700">

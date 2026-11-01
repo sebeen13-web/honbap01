@@ -16,6 +16,13 @@ export type DayType = "weekday" | "weekend" | "all";
 export type ConfirmationResult = "ok" | "not_ok";
 export type ClaimStatus = "pending" | "approved" | "rejected";
 export type StatKind = "view" | "directions" | "phone";
+export type RequestStatus = "open" | "registered" | "closed";
+/** create_restaurant_request() 결과 */
+export type CreateRequestResult = {
+  result: "created" | "voted" | "already_voted" | "registered" | "closed";
+  request_id?: string;
+  restaurant_id?: string | null;
+};
 
 type Rel<Name extends string, Col extends string, Ref extends string, One extends boolean> = {
   foreignKeyName: Name;
@@ -53,6 +60,8 @@ export type Database = {
           category: Category;
           business_hours: Json | null;
           owner_id: string | null;
+          /** 카카오 장소 id (요청과 연결하는 열쇠) */
+          kakao_place_id: string | null;
           location: unknown;
           created_at: string;
           updated_at: string;
@@ -67,6 +76,7 @@ export type Database = {
           category: Category;
           business_hours?: Json | null;
           owner_id?: string | null;
+          kakao_place_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -204,6 +214,35 @@ export type Database = {
         Update: never;
         Relationships: [Rel<"restaurant_daily_stats_restaurant_id_fkey", "restaurant_id", "restaurants", false>];
       };
+      /**
+       * "1인분 되게 해주세요" 요청. 누구나 읽기(요청자 created_by 는 비공개라 Row 에 없음).
+       * 만들기는 create_restaurant_request() 로만, 상태 변경은 관리자만.
+       */
+      restaurant_requests: {
+        Row: {
+          id: string;
+          kakao_place_id: string;
+          name: string;
+          address: string;
+          latitude: number;
+          longitude: number;
+          category: Category | null;
+          status: RequestStatus;
+          vote_count: number;
+          restaurant_id: string | null;
+          created_at: string;
+        };
+        Insert: never;
+        Update: { status?: RequestStatus; restaurant_id?: string | null };
+        Relationships: [Rel<"restaurant_requests_restaurant_id_fkey", "restaurant_id", "restaurants", false>];
+      };
+      /** 요청 +1. 본인 것만 보기/추가/취소 (누가 눌렀는지는 공개하지 않음) */
+      restaurant_request_votes: {
+        Row: { user_id: string; request_id: string; created_at: string };
+        Insert: { user_id: string; request_id: string };
+        Update: never;
+        Relationships: [Rel<"restaurant_request_votes_request_id_fkey", "request_id", "restaurant_requests", false>];
+      };
       /** 자유 텍스트 제보: 로그인 사용자만 등록(본인 명의), 읽기는 관리자만 */
       reports: {
         Row: { id: string; restaurant_id: string; reason: string; created_at: string; handled: boolean; user_id: string | null };
@@ -242,6 +281,8 @@ export type Database = {
           p_menus: Json;
           /** TimeRuleInput[] (0~8개) */
           p_time_rules: Json | null;
+          /** 카카오 장소 id (없으면 null) */
+          p_kakao_place_id?: string | null;
         };
         Returns: string;
       };
@@ -257,6 +298,31 @@ export type Database = {
       };
       /** 회원 탈퇴: 확인 기록·즐겨찾기·프로필 삭제, 사장님이면 식당 연결 해제. 관리자는 불가 */
       delete_my_account: { Args: Record<PropertyKey, never>; Returns: undefined };
+      /** 요청 만들기(로그인). 하루 새 요청 5개, 공개 중인 식당은 registered 로 돌려준다 */
+      create_restaurant_request: {
+        Args: {
+          p_kakao_place_id: string;
+          p_name: string;
+          p_address: string;
+          p_latitude: number;
+          p_longitude: number;
+          p_category?: Category | null;
+        };
+        Returns: Json;
+      };
+      /** 카카오 장소 id 들의 상태 (공개 식당 / 요청 / 내가 +1 했는지) */
+      place_request_status: {
+        Args: { p_kakao_place_ids: string[] };
+        Returns: PlaceRequestStatus[];
+      };
+      /** 요청 목록 (인기순 popular / 내 근처순 near). 좌표는 정렬용 인자로만 */
+      list_restaurant_requests: {
+        Args: { p_lat?: number | null; p_lng?: number | null; p_sort?: "popular" | "near"; p_limit?: number };
+        Returns: RequestListItem[];
+      };
+      i_voted_request: { Args: { p_request_id: string }; Returns: boolean };
+      /** 관리자: 요청을 기존 식당에 연결 → 요청 '등록됨' */
+      admin_link_request: { Args: { p_request_id: string; p_restaurant_id: string }; Returns: undefined };
       solo_available_at: { Args: { rules: Json; at_time?: string }; Returns: boolean | null };
       solo_next_available_at: { Args: { rules: Json; at_time?: string }; Returns: string | null };
     };
@@ -325,4 +391,33 @@ export type NearbyRestaurant = {
   not_ok_30d: number;
   last_ok_at: string | null;
   needs_review: boolean;
+  /** 식당 등록일 (홈의 '새로 등록된 곳') */
+  created_at: string;
+};
+
+export type PlaceRequestStatus = {
+  kakao_place_id: string;
+  /** 공개 중인 식당이면 그 id */
+  restaurant_id: string | null;
+  request_id: string | null;
+  request_status: RequestStatus | null;
+  vote_count: number | null;
+  i_voted: boolean;
+};
+
+export type RequestListItem = {
+  id: string;
+  kakao_place_id: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  category: Category | null;
+  status: RequestStatus;
+  vote_count: number;
+  restaurant_id: string | null;
+  created_at: string;
+  /** 기준점을 넘겼을 때만 */
+  distance_m: number | null;
+  i_voted: boolean;
 };

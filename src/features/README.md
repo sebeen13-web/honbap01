@@ -52,3 +52,11 @@
 - `legal/legal-page.tsx` — 약관·개인정보 처리방침 틀
 - `restaurants/nearby-parse.ts` — nearby_restaurants 의 jsonb(menus, time_rules) 파싱
 - `lib/safe-redirect.ts` — 로그인 후 돌아갈 경로를 같은 사이트 내부로 제한
+
+## 하단 탭 + 홈 + 요청 때 만든 파일
+
+- `tabs/tab-bar.tsx` — 하단 탭 (홈 / 지도 / 요청 / 내 정보)
+- `nearby/nearby-context.tsx` — 탭 공통 상태(위치·조회 결과·필터·즐겨찾기·로그인 유도), `nearby/location-bar.tsx` — 위치 한 줄
+- `home/` — `home-screen.tsx`(섹션), `menu-search.ts`·`menu-result-card.tsx`(메뉴 이름 검색)
+- `requests/` — `request-screen.tsx`(요청·+1·공유), `place-search.ts`(카카오 장소 검색, 음식 종류 추정)
+- `admin/request-actions.ts` — 요청 조사 완료·식당 연결
