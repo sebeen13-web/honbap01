@@ -22,7 +22,7 @@
 | 4 | 상세 + 원탭 확인 + 통계 호출 + 제보 | 완료 (`/restaurants/[id]`, `POST /api/restaurants/[id]/confirm`, DB 변경 없음) |
 | 5 | 사장님 등록·대시보드·스티커, 관리자 승인 | 완료 (`20261106000000_owner.sql`, `/owner`, `/owner/register`, `/owner/edit`, `/owner/sticker`, `/admin/claims`, `/admin/review`) |
 | 실데이터 | 안산 1인분 가능 식당 조사 153곳(1차 40 + 2차 113) + 관리자 일괄 등록(`/admin/import`), 길찾기 출발지 = 내 위치 | 완료 (DB 변경 없음) |
-| 6 | 데이터 정리 점검, 배포 가이드 | 예정 |
+| 6 | 데이터 정리 점검, 배포 가이드 | 배포 가이드 작성 (`docs/DEPLOY.md`, Vercel) |
 
 이후 단계는 아래 **화면 명세를 반드시 따른다.**
 
